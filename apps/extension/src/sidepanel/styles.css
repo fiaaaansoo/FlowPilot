@@ -190,6 +190,18 @@ p {
   color: var(--on-accent);
 }
 
+/* Narrow side panel (Chrome's minimum is 320 px): three bold labels do not fit on one row.
+   Record, the main action at rest, takes the full width; Stop and Replay share the next row. */
+@media (max-width: 360px) {
+  .controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .control--record {
+    grid-column: 1 / -1;
+  }
+}
+
 .control svg {
   width: 14px;
   height: 14px;
@@ -556,4 +568,13 @@ p {
 
 .ai-memory {
   margin-top: var(--space-2);
+}
+
+/* Left-aligned with the section text (the link button's padding only pads its hit area). */
+.ai-memory > .link-button {
+  margin-left: -4px;
+}
+
+.choice-row input {
+  margin: 0;
 }
