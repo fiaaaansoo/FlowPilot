@@ -2,18 +2,18 @@
 
 ## Branches
 
-- `main` : toujours vert (CI `check` + `e2e`).
-- Travail : `feat/<slug>`, `fix/<slug>`, `docs/<slug>`, `chore/<slug>`, `test/<slug>`.
+- `main`: always green (CI `check` + `e2e`).
+- Work: `feat/<slug>`, `fix/<slug>`, `docs/<slug>`, `chore/<slug>`, `test/<slug>`.
 
 ## Commits
 
-[Conventional Commits](https://www.conventionalcommits.org/fr/) : `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`, avec un scope optionnel (`feat(extension): …`, `fix(shared): …`). Sujet à l'impératif, en anglais ou en français, sans point final.
+[Conventional Commits](https://www.conventionalcommits.org/en/): `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `ci:`, with an optional scope (`feat(extension): …`, `fix(shared): …`). Subject in the imperative mood, in English or French, no trailing period.
 
-**Pas de trailer d'attribution IA** : aucune ligne `Co-Authored-By: Claude …` ni « Generated with Claude Code » dans les commits et les PR. Le dépôt n'a qu'une autrice ou un auteur.
+**No AI attribution trailer**: no `Co-Authored-By: Claude …` line and no "Generated with Claude Code" in commits and PRs. The repository has a single author.
 
 ## Pull requests
 
-- Une PR = un sujet. Description : quoi, pourquoi, comment c'est vérifié.
-- Avant d'ouvrir : `npm run check` et `npm run test:e2e` passent en local.
-- La CI GitHub Actions (`.github/workflows/ci.yml`) doit être verte avant le merge.
-- Toute nouvelle permission Chrome est justifiée dans `docs/architecture.md`.
+- One PR = one topic. Description: what, why, how it is verified.
+- Before opening: `npm run check` and `npm run test:e2e` pass locally.
+- The GitHub Actions CI (`.github/workflows/ci.yml`) must be green before merging.
+- Any new Chrome permission is justified in `docs/architecture.md`.
