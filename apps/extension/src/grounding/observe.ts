@@ -1,6 +1,6 @@
 import { LIMITS, MAX_OBSERVATION_ELEMENTS, fail, ok, sanitizeUrl, type Candidate, type Observation, type Result } from '@flowpilot/shared';
 import { isIrreversibleAction, isSensitiveField, submissionScope } from '../recorder/classify';
-import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, sameOrigin, stableAttributes, textOf } from './dom';
+import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, sameOrigin, stableAttributes, submitsCrossOrigin, textOf } from './dom';
 
 /**
  * Page observation for AI recovery (content script).
@@ -63,7 +63,8 @@ export function describeCandidate(el: Element, ref: string): Candidate {
   if (section && section !== name) candidate.section = section;
   if (isDisabled(el)) candidate.disabled = true;
   if (isIrreversibleAction(el) || isIrreversibleAction(submissionScope(el))) candidate.irreversible = true;
-  if (!sameOrigin(el)) candidate.sameOrigin = false;
+  // A link or submit control that leaves the origin, or a field whose Enter would send its form there.
+  if (!sameOrigin(el) || submitsCrossOrigin(submissionScope(el))) candidate.sameOrigin = false;
   return candidate;
 }
 

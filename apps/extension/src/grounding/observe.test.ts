@@ -153,6 +153,15 @@ describe('cross-origin submissions (Sprint 4)', () => {
     expect(result.ok ? '' : result.error.message).toContain('https://evil.example');
   });
 
+  it('a field whose Enter would send its form to another site is marked cross-origin (never offered to the model)', () => {
+    const elements = observePage(document, ids).elements;
+    expect(elements.find((e) => e.name === 'Mots-clés')?.sameOrigin).toBe(false);
+    expect(elements.find((e) => e.name === 'Rechercher')?.sameOrigin).toBe(false);
+    expect(elements.find((e) => e.name === 'Aide')?.sameOrigin).toBeUndefined();
+    document.body.innerHTML = `<form id="far" action="https://evil.example/collect"></form><input aria-label="Ville" form="far" />`;
+    expect(observePage(document, ids).elements.find((e) => e.name === 'Ville')?.sameOrigin).toBe(false);
+  });
+
   it('a plain button inside that form submits nothing and is not gated', () => {
     const ref = observePage(document, ids).elements.find((e) => e.name === 'Aide')?.ref ?? '';
     expect(performByRef(step('click'), `snap-${seq}`, ref, { confirmed: false }).ok).toBe(true);
