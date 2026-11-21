@@ -47,11 +47,21 @@ function sectionLabel(el: Element): string | undefined {
 
 const CONTRACT_TAG = /^[a-z][a-z0-9-]{0,31}$/;
 
+/** Where activating the element sends the user or the form data: a link target, a form action, a formaction. */
+function destination(el: Element): string | null {
+  if (el instanceof HTMLAnchorElement || el instanceof HTMLAreaElement) return el.getAttribute('href');
+  if (el instanceof HTMLFormElement) return el.getAttribute('action');
+  if ((el instanceof HTMLButtonElement || el instanceof HTMLInputElement) && el.form) {
+    return el.getAttribute('formaction') ?? el.form.getAttribute('action');
+  }
+  return null;
+}
+
 function sameOrigin(el: Element): boolean {
-  const href = el.getAttribute('href');
-  if (!href || !(el instanceof HTMLAnchorElement || el instanceof HTMLAreaElement)) return true;
+  const target = destination(el);
+  if (!target) return true;
   try {
-    return new URL(href, el.ownerDocument.baseURI).origin === el.ownerDocument.defaultView?.location.origin;
+    return new URL(target, el.ownerDocument.baseURI).origin === el.ownerDocument.defaultView?.location.origin;
   } catch {
     return false;
   }
@@ -82,7 +92,7 @@ export function observePage(doc: Document = document, newId: () => string = () =
   const elements: Candidate[] = [];
   for (const el of Array.from(doc.querySelectorAll(OBSERVABLE))) {
     if (elements.length >= MAX_OBSERVED_ELEMENTS) break;
-    if (!(el instanceof HTMLFormElement) && !isVisible(el)) continue;
+    if (!isVisible(el)) continue;
     if (isSensitiveField(el)) continue;
     // Tags outside the recovery contract (e.g. custom elements with "_" or ".") are not observable.
     if (!CONTRACT_TAG.test(el.tagName.toLowerCase())) continue;
@@ -111,7 +121,7 @@ export function resolveRef(snapshotId: string, ref: string, doc: Document = docu
   const el = current.refs.get(ref)?.deref();
   const observed = current.observed.get(ref);
   if (!el || !observed || !el.isConnected) return fail('TARGET_NOT_FOUND', 'L’élément proposé n’est plus dans la page.');
-  if (!(el instanceof HTMLFormElement) && !isVisible(el)) return fail('TARGET_NOT_INTERACTABLE', 'L’élément proposé est masqué.');
+  if (!isVisible(el)) return fail('TARGET_NOT_INTERACTABLE', 'L’élément proposé est masqué.');
   if (isSensitiveField(el)) return fail('TARGET_NOT_INTERACTABLE', 'Champ sensible : jamais utilisé par la récupération.');
   if (!sameIdentity(observed, describeCandidate(el, ref))) {
     return fail('TARGET_NOT_FOUND', 'L’élément proposé a changé depuis l’observation.');

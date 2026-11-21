@@ -414,7 +414,7 @@ describe('SessionController — AI recovery', () => {
       snapshotId: 'snap-1',
       url: 'http://localhost:5173/',
       title: 'Démo',
-      elements: [{ ref: 'e2', tag: 'button', role: 'button', name: 'Trouver des offres', attributes: { type: 'submit' } }],
+      elements: [{ ref: 'e2', tag: 'button', role: 'button', name: 'Lancer la recherche', attributes: { type: 'submit' } }],
     };
   });
 
@@ -470,7 +470,7 @@ describe('SessionController — AI recovery', () => {
       makeWorkflow([
         { id: 's1', kind: 'navigate', url: 'http://localhost:5173/' },
         { id: 's2', kind: 'click', target: target('Rechercher') },
-        { id: 's3', kind: 'click', target: target('Valider') },
+        { id: 's3', kind: 'click', target: target('Rechercher encore') },
         { id: 's4', kind: 'waitForNavigation', url: 'http://localhost:5173/results.html' },
       ]),
     );

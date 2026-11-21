@@ -58,7 +58,7 @@ test.describe('AI recovery', () => {
     expect((run?.log as { recovery?: unknown }[])[2]?.recovery).toBeUndefined();
   });
 
-  test('with AI, the step is recovered, verified, memorized, then reused without a model call', async ({
+  test('with AI, a synonym is proposed, confirmed by the user, verified, memorized, then reused alone', async ({
     context,
     sidePanel,
     serviceWorker,
@@ -70,6 +70,10 @@ test.describe('AI recovery', () => {
     await setVariant(demo, 'synonymes');
 
     await replay(sidePanel, demo);
+    // A pure synonym shares no word with the recorded label: the model's proposal needs the user.
+    const prompt = sidePanel.getByRole('alertdialog', { name: 'Proposition de l’IA à confirmer' });
+    await expect(prompt).toContainText('« Trouver des offres »', { timeout: 30_000 });
+    await prompt.getByRole('button', { name: 'Confirmer et exécuter' }).click();
     await expect(sidePanel.getByText(/Dernière lecture réussie, 4 sur 4 étapes/)).toBeVisible({ timeout: 30_000 });
     await expect(demo).toHaveURL(/results\.html\?q=data/);
     await expect(sidePanel.locator('.step').nth(2)).toContainText('trouvée par récupération IA (modèle de langage)');
@@ -84,9 +88,11 @@ test.describe('AI recovery', () => {
     // The next step succeeded, so the correction was verified and memorized.
     await expect.poll(async () => ((await backendCall(port, token, '/v1/memory')) as unknown[]).length).toBe(1);
 
+    // Second replay: the verified correction of this very step is reused alone, without the model.
     await setVariant(demo, 'synonymes');
     await replay(sidePanel, demo);
     await expect(sidePanel.locator('.step').nth(2)).toContainText('récupération IA (correction mémorisée)', { timeout: 30_000 });
+    await expect(sidePanel.getByRole('alertdialog')).toHaveCount(0);
     const second = await latestRun(serviceWorker);
     expect((second?.log as { recovery?: Record<string, unknown> }[])[2]?.recovery).toMatchObject({ strategy: 'memory', modelCalls: 0 });
     const metrics = (await backendCall(port, token, '/v1/metrics')) as Record<string, number>;

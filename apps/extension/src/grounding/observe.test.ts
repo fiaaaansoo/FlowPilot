@@ -98,5 +98,21 @@ describe('review regressions', () => {
       error: { code: 'CONFIRMATION_REQUIRED' },
     });
   });
+
+  it('never reads what was typed in a rich-text editor', () => {
+    document.body.innerHTML = `
+      <ul><li><div role="textbox" contenteditable="true" aria-label="Message">Mon message privé : code 4821</div>
+      <button type="button">Envoyer plus tard</button></li></ul>`;
+    expect(JSON.stringify(observePage(document, ids))).not.toMatch(/4821|privé/);
+  });
+
+  it('flags forms that send data off-origin and skips hidden forms', () => {
+    document.body.innerHTML = `
+      <form action="https://evil.example/collect"><button type="submit">Rechercher</button></form>
+      <form hidden aria-label="Caché"><button type="submit">Valider</button></form>`;
+    const elements = observePage(document, ids).elements;
+    expect(elements.find((e) => e.name === 'Rechercher')).toMatchObject({ sameOrigin: false });
+    expect(elements.some((e) => e.name === 'Caché' || e.name === 'Valider')).toBe(false);
+  });
 });
 

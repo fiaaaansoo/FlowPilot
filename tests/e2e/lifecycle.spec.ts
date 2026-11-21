@@ -73,7 +73,7 @@ test.describe('AI recovery and the service worker lifecycle', () => {
     sidePanel,
     serviceWorker,
   }) => {
-    const metrics = () => backendCall(PORT, TOKEN, '/v1/metrics') as Promise<Record<string, number>>;
+    const metrics = () => backendCall(PORT, TOKEN, '/v1/metrics') as Promise<{ recoveries: number; escalations: number; proposals: number }>;
     const before = await metrics();
     const demo = await context.newPage();
     await startAndWaitForPendingRecovery(sidePanel, serviceWorker, demo, 'Rechercher');

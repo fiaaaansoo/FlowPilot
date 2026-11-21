@@ -69,11 +69,18 @@ export function roleOf(el: Element): string | undefined {
 const LABELABLE = new Set(['input', 'select', 'textarea', 'button', 'meter', 'output', 'progress']);
 
 const NO_TEXT = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
+const TYPABLE_ROLES = new Set(['textbox', 'searchbox', 'combobox']);
+
+/** A field whose content the user types: native fields, rich-text editors and ARIA text boxes. */
+export function isTypingField(el: Element): boolean {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return true;
+  if (el instanceof HTMLElement && (el.isContentEditable || el.getAttribute('contenteditable') === 'true')) return true;
+  return TYPABLE_ROLES.has(el.getAttribute('role') ?? '');
+}
 
 /** Texte d'un sous-arbre sans le contenu des champs (jamais de valeur saisie) ni des scripts. */
 export function textOf(el: Element): string {
-  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return '';
-  if (NO_TEXT.has(el.tagName)) return '';
+  if (isTypingField(el) || NO_TEXT.has(el.tagName)) return '';
   let text = '';
   for (const node of Array.from(el.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE) text += node.textContent ?? '';
@@ -114,8 +121,7 @@ export function accessibleName(el: Element): string {
   }
   if (el instanceof HTMLImageElement) return normalizeText(el.alt);
 
-  const isField = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
-  if (!isField) {
+  if (!isTypingField(el)) {
     const text = normalizeText(textOf(el));
     if (text) return text;
   }

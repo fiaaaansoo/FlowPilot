@@ -70,9 +70,15 @@ Unused keys must be "" (strings) or 0 (confidence). Keep reason under 200 charac
 
 
 def render_user_message(*, task_json: str, page_json: str, prior_correction: dict[str, Any] | None) -> str:
-    parts = [f"<task>\n{task_json}\n</task>"]
+    # The task and a prior correction also quote page-derived labels: "<" is escaped in every block.
+    parts = [f"<task>\n{_escape(task_json)}\n</task>"]
     if prior_correction:
-        parts.append(f"<prior_correction>\n{json.dumps(prior_correction, ensure_ascii=False)}\n</prior_correction>")
+        prior = _escape(json.dumps(prior_correction, ensure_ascii=False))
+        parts.append(f"<prior_correction>\n{prior}\n</prior_correction>")
     parts.append(f"<untrusted_page_content>\n{page_json}\n</untrusted_page_content>")
     parts.append("Choose the next action.")
     return "\n\n".join(parts)
+
+
+def _escape(text: str) -> str:
+    return text.replace("<", "\\u003c")

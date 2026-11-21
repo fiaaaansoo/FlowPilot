@@ -74,6 +74,11 @@ def _compact(entry: ContextEntry) -> dict[str, object]:
     return item
 
 
+def escape_markup(text: str) -> str:
+    """JSON text with "<" escaped: page-derived strings cannot open or close a prompt block."""
+    return text.replace("<", "\\u003c")
+
+
 def usable_candidates(request: RecoveryRequest) -> list[Candidate]:
     """The only elements a recovery may use: compatible with the step, on the workflow origin (cross-origin
     links are never executed, nor shown to the model), and not already rejected or failed."""
@@ -133,7 +138,7 @@ def render_untrusted(request: RecoveryRequest, pack: ContextPack) -> str:
         "elements": [_compact(entry) for entry in pack.entries],
     }
     # Escape "<" so page text cannot close the <untrusted_page_content> block (still valid JSON).
-    return json.dumps(payload, ensure_ascii=False, indent=None).replace("<", "\\u003c")
+    return escape_markup(json.dumps(payload, ensure_ascii=False, indent=None))
 
 
 def render_task(request: RecoveryRequest) -> str:

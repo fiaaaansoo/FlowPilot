@@ -150,6 +150,21 @@ export function validateProposal(
 }
 
 /** Human-readable description of a candidate, for the confirmation prompt (untrusted text, display only). */
+const IDENTIFIERS = ['id', 'name', 'data-testid', 'data-test', 'data-qa', 'data-cy', 'href'] as const;
+
+/** Word stems of a label (accents and case ignored, short words dropped). */
+function stems(text: string | undefined): Set<string> {
+  const words = (text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/);
+  return new Set(words.filter((w) => w.length >= 4).map((w) => w.slice(0, 6)));
+}
+
+/** Does the candidate share a stable identifier or a label word with the recorded element? */
+export function sharesIdentity(target: ElementStep['target'], candidate: Candidate): boolean {
+  if (IDENTIFIERS.some((key) => target.attributes[key] !== undefined && target.attributes[key] === candidate.attributes[key])) return true;
+  const recorded = stems(target.name ?? target.text);
+  return [...stems(candidate.name ?? candidate.text)].some((stem) => recorded.has(stem));
+}
+
 export function candidateLabel(candidate: Candidate): string {
   const label = candidate.name ?? candidate.text ?? candidate.attributes['aria-label'] ?? candidate.attributes.name ?? `<${candidate.tag}>`;
   const where = candidate.context ?? candidate.section;
@@ -260,6 +275,7 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
       inputTokens: log.inputTokens + usage.inputTokens,
       outputTokens: log.outputTokens + usage.outputTokens,
       costUsd: Number((log.costUsd + usage.estimatedCostUsd).toFixed(6)),
+      serviceLatencyMs: (log.serviceLatencyMs ?? 0) + usage.latencyMs,
       provider: usage.provider,
       recoveryId: response.value.recoveryId,
       strategy: response.value.decision.strategy,
@@ -292,8 +308,10 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
       candidate.irreversible === true ||
       ctx.mode === 'confirm-always' ||
       needsHuman(ctx.step) ||
-      // Same rule as the backend, enforced here too: a model never redirects a value or a submission alone.
-      (strategy === 'llm' && ctx.step.kind !== 'click');
+      // Independent of the backend: only a lexical match may move a value or a submission without the user,
+      // and a model's choice must share a word or an identifier with the recorded element to act alone.
+      (strategy !== 'semantic' && ctx.step.kind !== 'click') ||
+      (strategy === 'llm' && !sharesIdentity(ctx.step.target, candidate));
     const prompt: AiProposalPrompt = { kind: 'ai-proposal', proposed: candidateLabel(candidate), strategy, confidence, rationale };
     if (mustConfirm) {
       if (!(await ctx.requestHuman(prompt))) return escalate('aborted', ABORTED, 'refusé par l’utilisateur');

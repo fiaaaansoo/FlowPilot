@@ -13,7 +13,7 @@ import {
 import { target } from '../test/fakes';
 import { RunRecoveryBudget, createBackendClient, recoverStep, type BackendClient, type RecoveryContext, type RecoveryEnv } from './recovery';
 
-const STEP: ElementStep = { id: 's5', kind: 'click', target: target('Rechercher') };
+const STEP: ElementStep = { id: 's5', kind: 'click', target: target('Rechercher des offres') };
 const BUTTON: Candidate = { ref: 'e2', tag: 'button', role: 'button', name: 'Trouver des offres', attributes: { type: 'submit' } };
 const LINK_OUT: Candidate = { ref: 'e3', tag: 'a', role: 'link', name: 'Partenaire', attributes: { href: 'https://evil.example' }, sameOrigin: false };
 const FIELD: Candidate = { ref: 'e4', tag: 'input', role: 'textbox', name: 'Mots-clés', attributes: {} };
@@ -208,7 +208,7 @@ describe('recoverStep', () => {
         controller.abort(); // the user stopped the replay while the backend was answering
         return response;
       },
-      reportOutcome: client.reportOutcome,
+      reportOutcome: (id, report) => client.reportOutcome(id, report),
     };
     const result = await recoverStep(recoveryEnv, late, context({ signal: controller.signal }));
     expect(result).toMatchObject({ ok: false, log: { outcome: 'aborted' } });
@@ -230,6 +230,24 @@ describe('recoverStep', () => {
     );
     expect(result).toMatchObject({ ok: false, log: { outcome: 'aborted' } });
     expect(calls).toEqual([]);
+  });
+
+  it('a model choice sharing no word or identifier with the recorded element is confirmed first', async () => {
+    const { recoveryEnv, calls } = env([{ ...BUTTON, name: 'Se déconnecter' }]);
+    const requestHuman = vi.fn(() => Promise.resolve(false));
+    const result = await recoverStep(recoveryEnv, backend(propose('e2')).client, context({ requestHuman }));
+    expect(requestHuman).toHaveBeenCalledOnce(); // the backend said "no confirmation"; the extension asks anyway
+    expect(result.ok).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it('a memorized correction never types a recorded value without the user', async () => {
+    const { recoveryEnv, calls } = env();
+    const requestHuman = vi.fn(() => Promise.resolve(true));
+    const step: ElementStep = { id: 's2', kind: 'input', value: 'data', target: target('Mots-clés') };
+    await recoverStep(recoveryEnv, backend(propose('e4', { strategy: 'memory' })).client, context({ step, requestHuman }));
+    expect(requestHuman).toHaveBeenCalledOnce();
+    expect(calls[0]?.confirmed).toBe(true);
   });
 
   it('stopping at the confirmation prompt executes nothing', async () => {

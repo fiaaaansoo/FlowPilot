@@ -39,7 +39,15 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .config import Settings
-from .context_builder import ContextPack, build_context, fingerprint, render_task, render_untrusted, usable_candidates
+from .context_builder import (
+    ContextPack,
+    build_context,
+    escape_markup,
+    fingerprint,
+    render_task,
+    render_untrusted,
+    usable_candidates,
+)
 from .contracts import Binding, Candidate, Decision, Escalate, ProposeTarget, RecoveryRequest, RecoveryResponse, Usage
 from .grounding import Score, accepts, decide, rank, score
 from .pricing import estimate_cost
@@ -57,6 +65,9 @@ MAX_INVALID_OUTPUTS = 2
 MAX_OUTPUT_TOKENS = 1024
 #: The model's choice must be the unique best deterministic match (ties do not count as agreement).
 AGREEMENT_MARGIN = 0.01
+#: ... and that match must share something with the recorded element beyond its role and tag: words of its
+#: label, or a stable identifier. A lone button of the right type is not evidence (it is just the only one).
+LEXICAL_EVIDENCE = 0.3
 MIN_OUTPUT_TOKENS = 128
 #: Steps where a model-chosen element would receive a recorded value or may submit a form.
 VALUE_OR_SUBMIT_KINDS = frozenset({"input", "select", "check", "press", "submit"})
@@ -149,7 +160,20 @@ class RecoveryAgent:
             if len(matches) == 1:
                 self.store.mark_used(prior.id)
                 run.correction_id = prior.id
-                return self._propose(run, matches[0], 0.95, "memory", "Verified correction from a previous run.")
+                b = request.binding
+                same_scope = prior.workflow_id == b.workflow_id and prior.step_id == b.step_id
+                return self._propose(
+                    run,
+                    matches[0],
+                    0.95,
+                    "memory",
+                    "Verified correction from a previous run."
+                    if same_scope
+                    else "Correction learned in another workflow.",
+                    # Outside its exact workflow step, or when it would receive a value or submit a form,
+                    # a memorized correction is only a suggestion.
+                    force_confirm=not same_scope or request.step.kind in VALUE_OR_SUBMIT_KINDS,
+                )
         else:
             run.log(State.MEMORY, correction=None)
 
@@ -254,7 +278,10 @@ class RecoveryAgent:
                 return self._escalate(run, "llm", action.reason[:280] or "The model found no safe match.")
             if action.action in {"find_elements", "inspect_element"}:
                 result = self._tool(run, action)
-                messages += [Message("assistant", reply), Message("user", f"<tool_result>\n{result}\n</tool_result>")]
+                messages += [
+                    Message("assistant", reply),
+                    Message("user", f"<tool_result>\n{escape_markup(result)}\n</tool_result>"),
+                ]
                 continue
             return self._validate_proposal(run, action)
 
@@ -371,6 +398,7 @@ class RecoveryAgent:
             and ranked[0].ref == candidate.ref
             and (len(ranked) == 1 or ranked[0].total - ranked[1].total >= AGREEMENT_MARGIN)
         )
+        evidence = support.label >= LEXICAL_EVIDENCE or support.identifiers > 0 or support.context >= LEXICAL_EVIDENCE
         structural = support.structure >= STRUCTURAL_SUPPORT
         confident = action.confidence >= AUTO_CONFIDENCE
         human_requested = action.action == "request_user_confirmation"
@@ -378,8 +406,16 @@ class RecoveryAgent:
         sensitive_kind = request.step.kind in VALUE_OR_SUBMIT_KINDS
         if action.confidence < CONFIRM_CONFIDENCE:
             return self._escalate(run, "llm", f"Model confidence too low ({action.confidence:.2f}).")
-        run.log(State.VALIDATE, agrees=agrees, duplicates=duplicates, structural=structural)
-        auto = confident and structural and agrees and duplicates == 0 and not human_requested and not sensitive_kind
+        run.log(State.VALIDATE, agrees=agrees, evidence=evidence, duplicates=duplicates, structural=structural)
+        auto = (
+            confident
+            and structural
+            and agrees
+            and evidence
+            and duplicates == 0
+            and not human_requested
+            and not sensitive_kind
+        )
         return self._propose(
             run, candidate, action.confidence, "llm", action.reason or "Model proposal.", force_confirm=not auto
         )

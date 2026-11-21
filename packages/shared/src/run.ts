@@ -20,7 +20,10 @@ export interface RecoveryLog {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens?: number;
+  /** Whole recovery as seen by the extension, including any wait for the user's confirmation. */
   latencyMs: number;
+  /** Time spent in the recovery service (memory, grounding and model inference), without the user's wait. */
+  serviceLatencyMs?: number;
   costUsd: number;
   provider?: string;
   model?: string;
@@ -79,6 +82,7 @@ function isRecoveryLog(raw: unknown): raw is RecoveryLog {
     isFiniteNumber(raw.inputTokens) &&
     isFiniteNumber(raw.outputTokens) &&
     isFiniteNumber(raw.latencyMs) &&
+    (raw.serviceLatencyMs === undefined || isFiniteNumber(raw.serviceLatencyMs)) &&
     isFiniteNumber(raw.costUsd)
   );
 }
