@@ -1,0 +1,420 @@
+/*
+ * Side Panel FlowPilot. Métaphore : tableau de bord d'instruments.
+ * Un seul élément expressif (l'annonciateur d'état) ; le reste reste sobre.
+ */
+
+:root {
+  --panel: #eef1f3;
+  --surface: #ffffff;
+  --ink: #1d2630;
+  --muted: #56636f;
+  --line: #d3d9de;
+  --record: #c9480b; /* orange enregistreur de vol */
+  --record-glow: rgb(233 89 12 / 0.35);
+  --replay: #0f7b6c;
+  --replay-glow: rgb(15 123 108 / 0.3);
+  --danger: #b3261e;
+  --focus: #2563c9;
+  --on-accent: #ffffff;
+  --lamp-off: #b9c2ca;
+
+  --radius-control: 6px;
+  --radius-surface: 4px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
+  font-family: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--panel);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --panel: #161c22;
+    --surface: #1f272f;
+    --ink: #e4e9ed;
+    --muted: #9aa6b1;
+    --line: #34404b;
+    --record: #f07a3c;
+    --record-glow: rgb(240 122 60 / 0.35);
+    --replay: #3cbfa9;
+    --replay-glow: rgb(60 191 169 / 0.3);
+    --danger: #f2877f;
+    --focus: #7aa7ff;
+    --on-accent: #10161b;
+    --lamp-off: #4a5661;
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Chrome injecte une feuille par défaut dans les pages d'extension
+   (body { font-size: 75%; font-family: system-ui… }) : on la neutralise ici. */
+body {
+  margin: 0;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  max-width: 560px;
+}
+
+.panel-header h1 {
+  font-size: 1.2rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+/* --- Annonciateur ------------------------------------------------------- */
+
+.annunciator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  /* Biseau intérieur : un voyant encastré dans le tableau de bord. */
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.08);
+  transition:
+    border-color 160ms ease-out,
+    box-shadow 160ms ease-out;
+}
+
+.annunciator__lamp {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--lamp-off);
+  transition:
+    background-color 160ms ease-out,
+    box-shadow 160ms ease-out;
+}
+
+.annunciator__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.annunciator__detail {
+  color: var(--muted);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.annunciator[data-status='recording'] {
+  border-color: var(--record);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.08),
+    0 0 0 3px var(--record-glow);
+}
+
+.annunciator[data-status='recording'] .annunciator__lamp {
+  background: var(--record);
+  box-shadow: 0 0 10px 2px var(--record-glow);
+}
+
+.annunciator[data-status='recording'] .annunciator__title {
+  color: var(--record);
+}
+
+.annunciator[data-status='replaying'] {
+  border-color: var(--replay);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.08),
+    0 0 0 3px var(--replay-glow);
+}
+
+.annunciator[data-status='replaying'] .annunciator__lamp {
+  background: var(--replay);
+  box-shadow: 0 0 10px 2px var(--replay-glow);
+}
+
+.annunciator[data-status='replaying'] .annunciator__title {
+  color: var(--replay);
+}
+
+/* --- Commandes ---------------------------------------------------------- */
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  color: var(--on-accent);
+}
+
+.control svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  flex: none;
+}
+
+.control--record {
+  background: var(--record);
+}
+
+.control--replay {
+  background: var(--replay);
+}
+
+.control--stop {
+  background: var(--ink);
+  color: var(--panel);
+}
+
+.control:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+
+.control:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.control:disabled {
+  cursor: not-allowed;
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+/* --- Alerte ------------------------------------------------------------- */
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-left: 3px solid var(--danger);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+/* --- Sections ----------------------------------------------------------- */
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.panel-section h2 {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.empty,
+.note,
+.hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.hint--error {
+  color: var(--danger);
+}
+
+.workflows,
+.sites {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.workflow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.workflow[data-selected='true'] {
+  border-color: var(--ink);
+}
+
+.workflow__pick {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-2);
+  cursor: pointer;
+}
+
+.workflow__pick input {
+  grid-row: 1;
+  align-self: start;
+  margin: 5px 0 0;
+  accent-color: var(--ink);
+}
+
+.workflow__name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.workflow__meta,
+.workflow__run {
+  grid-column: 2;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.workflow__run[data-outcome='succeeded'] {
+  color: var(--replay);
+}
+
+.workflow__run[data-outcome='failed'] {
+  color: var(--danger);
+}
+
+.site {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.site__name {
+  overflow-wrap: anywhere;
+}
+
+.site-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.site-form label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.site-form__row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.site-form input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.site-form input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.secondary-button {
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  background: var(--surface);
+}
+
+.link-button {
+  flex: none;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link-button:not(:disabled):hover {
+  color: var(--danger);
+}
+
+.link-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+  .control:not(:disabled):active {
+    transform: none;
+  }
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offre | Offres du Coin</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">Offres du Coin</a>
+      <p class="demo-note">Site de démonstration FlowPilot, données fictives.</p>
+    </header>
+
+    <main class="page">
+      <a class="back" href="/results.html" id="back-link">Retour aux résultats</a>
+      <article id="offer" class="offer"></article>
+
+      <!-- Action sensible : sert de cible aux futurs tests de confirmation humaine (human-in-the-loop). -->
+      <section id="apply" class="apply" hidden>
+        <h2>Postuler</h2>
+        <form id="apply-form">
+          <div class="field">
+            <label for="apply-name">Nom complet</label>
+            <input id="apply-name" name="name" autocomplete="name" required />
+          </div>
+          <div class="field">
+            <label for="apply-email">E-mail</label>
+            <input id="apply-email" name="email" type="email" autocomplete="email" required />
+          </div>
+          <div class="field">
+            <label for="apply-message">Message</label>
+            <textarea id="apply-message" name="message" rows="4"></textarea>
+          </div>
+          <button type="submit" class="primary">Envoyer la candidature</button>
+        </form>
+        <p id="apply-done" class="done" role="status" hidden>
+          Candidature enregistrée localement. Rien n’a été envoyé : ce site est une démonstration.
+        </p>
+      </section>
+    </main>
+    <script type="module" src="/src/offer.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rechercher une offre | Offres du Coin</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">Offres du Coin</a>
+      <p class="demo-note">Site de démonstration FlowPilot, données fictives.</p>
+    </header>
+
+    <main class="page">
+      <h1>Rechercher une offre</h1>
+      <form id="search-form" class="search" action="/results.html" method="get">
+        <div class="field">
+          <label for="q">Mots-clés</label>
+          <input id="q" name="q" type="search" placeholder="Développeur, data, QA…" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="ville">Ville</label>
+          <select id="ville" name="ville">
+            <option value="">Toutes les villes</option>
+            <option>Lyon</option>
+            <option>Paris</option>
+            <option>Grenoble</option>
+            <option>Nantes</option>
+          </select>
+        </div>
+
+        <fieldset class="field">
+          <legend>Type de contrat</legend>
+          <label class="choice"><input type="checkbox" name="contrat" value="CDI" /> CDI</label>
+          <label class="choice"><input type="checkbox" name="contrat" value="CDD" /> CDD</label>
+          <label class="choice"><input type="checkbox" name="contrat" value="Stage" /> Stage</label>
+          <label class="choice"><input type="checkbox" name="contrat" value="Alternance" /> Alternance</label>
+        </fieldset>
+
+        <label class="choice">
+          <input type="checkbox" name="teletravail" value="oui" />
+          Télétravail possible uniquement
+        </label>
+
+        <button type="submit" class="primary">Rechercher</button>
+      </form>
+    </main>
+    <script type="module" src="/src/search.ts"></script>
+  </body>
+</html>

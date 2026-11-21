@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "FlowPilot",
+  "description": "Enregistre une procédure dans le navigateur puis la rejoue. Accès limité aux sites que vous autorisez.",
+  "version": "0.0.0",
+  "minimum_chrome_version": "120",
+  "action": {
+    "default_title": "Ouvrir FlowPilot"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["sidePanel", "storage", "scripting"],
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"]
+}

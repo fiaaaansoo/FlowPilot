@@ -1,0 +1,13 @@
+{
+  "name": "@flowpilot/demo-site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Site local de recherche d'emploi fictif servant de terrain d'essai à FlowPilot.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

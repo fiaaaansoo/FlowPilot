@@ -1,0 +1,108 @@
+import { isFiniteNumber as isNum, isNonEmptyString as isStr, isRecord } from './guards.js';
+import { fail, ok, type Result } from './result.js';
+
+/**
+ * Machine d'état de la session FlowPilot. Pure et sans dépendance Chrome :
+ * le service worker l'applique, le Side Panel en dérive les boutons actifs.
+ *
+ *   idle ──RECORD_STARTED──▶ recording ──STOPPED──▶ idle
+ *   idle ──REPLAY_STARTED──▶ replaying ──STOPPED | REPLAY_FINISHED──▶ idle
+ */
+
+export interface IdleSession {
+  status: 'idle';
+}
+
+export interface RecordingSession {
+  status: 'recording';
+  tabId: number;
+  origin: string;
+  workflowId: string;
+  /** Epoch ms. */
+  startedAt: number;
+}
+
+export interface ReplayingSession {
+  status: 'replaying';
+  tabId: number;
+  workflowId: string;
+  startedAt: number;
+  /** Index (0-based) de l'étape en cours d'exécution. */
+  stepIndex: number;
+}
+
+export type SessionState = IdleSession | RecordingSession | ReplayingSession;
+export type SessionStatus = SessionState['status'];
+
+export type SessionEvent =
+  | { type: 'RECORD_STARTED'; tabId: number; origin: string; workflowId: string; startedAt: number }
+  | { type: 'REPLAY_STARTED'; tabId: number; workflowId: string; startedAt: number }
+  | { type: 'STEP_STARTED'; stepIndex: number }
+  | { type: 'STOPPED' }
+  | { type: 'REPLAY_FINISHED' };
+
+export const IDLE: IdleSession = Object.freeze({ status: 'idle' });
+
+export function transition(state: SessionState, event: SessionEvent): Result<SessionState> {
+  switch (event.type) {
+    case 'RECORD_STARTED':
+      if (state.status !== 'idle') return invalid(state, event);
+      return ok({
+        status: 'recording',
+        tabId: event.tabId,
+        origin: event.origin,
+        workflowId: event.workflowId,
+        startedAt: event.startedAt,
+      });
+    case 'REPLAY_STARTED':
+      if (state.status !== 'idle') return invalid(state, event);
+      return ok({
+        status: 'replaying',
+        tabId: event.tabId,
+        workflowId: event.workflowId,
+        startedAt: event.startedAt,
+        stepIndex: 0,
+      });
+    case 'STEP_STARTED':
+      if (state.status !== 'replaying') return invalid(state, event);
+      return ok({ ...state, stepIndex: event.stepIndex });
+    case 'STOPPED':
+      if (state.status === 'idle') return invalid(state, event);
+      return ok(IDLE);
+    case 'REPLAY_FINISHED':
+      if (state.status !== 'replaying') return invalid(state, event);
+      return ok(IDLE);
+  }
+}
+
+function invalid(state: SessionState, event: SessionEvent): Result<never> {
+  return fail('INVALID_TRANSITION', `Action « ${event.type} » impossible depuis l'état « ${state.status} ».`);
+}
+
+export interface AvailableCommands {
+  canRecord: boolean;
+  canStop: boolean;
+  canReplay: boolean;
+}
+
+/** Boutons actifs du Side Panel. `hasWorkflow` : au moins un workflow sélectionnable. */
+export function availableCommands(state: SessionState, hasWorkflow: boolean): AvailableCommands {
+  return {
+    canRecord: state.status === 'idle',
+    canStop: state.status !== 'idle',
+    canReplay: state.status === 'idle' && hasWorkflow,
+  };
+}
+
+/** Lecture défensive depuis le stockage : toute donnée inattendue redevient `idle`. */
+export function parseSession(raw: unknown): SessionState {
+  if (!isRecord(raw)) return IDLE;
+  const s = raw;
+  if (s.status === 'recording' && isNum(s.tabId) && isStr(s.origin) && isStr(s.workflowId) && isNum(s.startedAt)) {
+    return { status: 'recording', tabId: s.tabId, origin: s.origin, workflowId: s.workflowId, startedAt: s.startedAt };
+  }
+  if (s.status === 'replaying' && isNum(s.tabId) && isStr(s.workflowId) && isNum(s.startedAt) && isNum(s.stepIndex)) {
+    return { status: 'replaying', tabId: s.tabId, workflowId: s.workflowId, startedAt: s.startedAt, stepIndex: s.stepIndex };
+  }
+  return IDLE;
+}
