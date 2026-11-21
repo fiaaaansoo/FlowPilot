@@ -5,11 +5,11 @@ One batch = one Claude. See § Batching in `crew/CLAUDE_CONTEXT/LIFECYCLE.md` fo
 
 ## Unsorted
 
-_Aucune tâche non classée._
+_No unsorted task._
 
-## Batch B — Backend agentique et évaluation
+## Batch B — Agentic backend and evaluation (sequential: Sprint 4 depends on Sprint 3)
 
-Zone : apps/api/, tests/, docs/
+Zone: package.json, apps/api/, apps/extension/, apps/demo-site/, packages/shared/, tests/, docs/, .github/, README.md, AGENTS.md, SECURITY.md, CONTRIBUTING.md
 
 - `sprint-3-agent-recovery.md`
 - `sprint-4-evaluation.md`
