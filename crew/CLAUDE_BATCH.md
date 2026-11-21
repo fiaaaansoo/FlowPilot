@@ -11,7 +11,7 @@ _Aucune tâche non classée._
 
 Zone : package.json, apps/extension/, apps/demo-site/, packages/shared/, tests/, docs/, .github/, README.md, AGENTS.md
 
-- `sprint-1-extension-scaffold.md`
+- ~~`sprint-1-extension-scaffold.md`~~
 - `sprint-2-record-replay.md`
 
 ## Batch B — Backend agentique et évaluation
