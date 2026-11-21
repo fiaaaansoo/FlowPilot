@@ -514,6 +514,9 @@ def _same_element(stored: Candidate, current: Candidate) -> bool:
     for key in ("id", "name", "data-testid", "href", "type"):
         if stored.attributes.get(key) != current.attributes.get(key):
             return False
+    # The same control in another form or region is a different control (a twin with another effect).
+    if stored.section and normalize(stored.section) != normalize(current.section):
+        return False
     return not stored.context or normalize(stored.context) == normalize(current.context)
 
 
