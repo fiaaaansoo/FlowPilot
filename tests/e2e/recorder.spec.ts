@@ -218,3 +218,72 @@ test.describe('Recorder & replay', () => {
     await expect(panel.getByText(/Dernière lecture réussie, 1 sur 1 étape/)).toBeVisible({ timeout: 15_000 });
   });
 });
+
+test.describe('Replay : garde-fous (non-régression de la revue)', () => {
+  const base = { schemaVersion: 2, origin: 'http://localhost:5173', createdAt: '2026-11-21T10:00:00.000Z' };
+
+  test('Arrêter pendant l’attente d’un élément différé : rien n’est déclenché quand il apparaît', async ({ context, sidePanel, serviceWorker }) => {
+    const app = await context.newPage();
+    await app.goto('/');
+    await app.bringToFront();
+    await seedWorkflow(serviceWorker, {
+      ...base,
+      id: 'differe',
+      name: 'Différé',
+      steps: [
+        { id: 's1', kind: 'navigate', url: 'http://localhost:5173/spa.html?delai=3000' },
+        { id: 's2', kind: 'input', target: { tag: 'input', role: 'textbox', name: 'Mots-clés de l’alerte', attributes: { name: 'motscles', type: 'text' }, css: 'input[name="motscles"]' }, value: 'arrêté' },
+      ],
+    });
+    await sidePanel.reload();
+    await sidePanel.getByRole('button', { name: 'Rejouer' }).click();
+    await expect(sidePanel.getByLabel('État de FlowPilot')).toContainText('Étape 2 sur 2', { timeout: 10_000 });
+    await sidePanel.getByRole('button', { name: 'Arrêter' }).click();
+    await expect(sidePanel.getByText(/Dernière lecture arrêtée/)).toBeVisible();
+    // Le champ apparaît après 3 s : il doit rester vide.
+    await expect(app.getByLabel('Mots-clés de l’alerte')).toBeVisible({ timeout: 10_000 });
+    await app.waitForTimeout(500);
+    await expect(app.getByLabel('Mots-clés de l’alerte')).toHaveValue('');
+  });
+
+  test('une action irréversible non marquée à l’enregistrement demande quand même confirmation', async ({ context, sidePanel, serviceWorker }) => {
+    const demo = await context.newPage();
+    await demo.goto('/');
+    await demo.bringToFront();
+    await seedWorkflow(serviceWorker, {
+      ...base,
+      id: 'non-marque',
+      name: 'Non marqué',
+      steps: [
+        { id: 's1', kind: 'navigate', url: 'http://localhost:5173/offer.html?id=qa-nantes' },
+        { id: 's2', kind: 'click', target: { tag: 'button', role: 'button', name: 'Supprimer', attributes: { id: 'apply-button' }, css: '#apply-button' } },
+      ],
+    });
+    await sidePanel.reload();
+    await sidePanel.getByRole('button', { name: 'Rejouer' }).click();
+    // L'id désigne le bouton « Postuler » : la page le juge irréversible et refuse d'agir sans accord.
+    const prompt = sidePanel.getByRole('alertdialog', { name: 'Confirmation requise' });
+    await expect(prompt).toBeVisible({ timeout: 15_000 });
+    await expect(demo.locator('#apply')).toBeHidden();
+    await prompt.getByRole('button', { name: 'Confirmer et exécuter' }).click();
+    await expect(demo.locator('#apply')).toBeVisible();
+  });
+});
+
+test('Entrée dans un formulaire réel : la soumission est enregistrée une seule fois et rejouée', async ({ context, sidePanel, serviceWorker }) => {
+  const demo = await context.newPage();
+  await demo.goto('/');
+  await startRecording(sidePanel, serviceWorker, demo);
+  await demo.getByLabel('Mots-clés').fill('python');
+  await demo.getByLabel('Mots-clés').press('Enter');
+  await expect(demo).toHaveURL(/results\.html\?q=python/);
+  await stopRecording(sidePanel);
+  const steps = await stepTexts(sidePanel);
+  expect(steps).toEqual(['Ouvrir /', 'Saisir « python » dans « Mots-clés »', 'Cliquer sur « Rechercher »', 'Attendre la page /results.html?q=python&ville=']);
+
+  await demo.goto('/spa.html');
+  await demo.bringToFront();
+  await sidePanel.getByRole('button', { name: 'Rejouer' }).click();
+  await expect(sidePanel.getByText(/Dernière lecture réussie, 4 sur 4 étapes/)).toBeVisible({ timeout: 20_000 });
+  await expect(demo).toHaveURL(/results\.html\?q=python/);
+});

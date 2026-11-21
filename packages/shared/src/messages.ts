@@ -1,6 +1,6 @@
 import { isFiniteNumber, isNonEmptyString, isRecord } from './guards.js';
 import { isErrorCode, type Result } from './result.js';
-import { parseRecordedEvent, type RecordedEvent } from './recording.js';
+import { parseRecordedEvent, type PageEvent, type RecordedEvent } from './recording.js';
 import type { SessionState } from './session.js';
 import type { ElementStep } from './workflow.js';
 
@@ -35,8 +35,13 @@ export type ContentRequest =
   | { type: 'content/ping' }
   /** Active ou coupe la capture. À l'arrêt, la réponse contient les saisies encore en attente. */
   | { type: 'content/record'; recording: boolean }
-  /** Localise la cible de l'étape (en attendant au plus `timeoutMs`) puis exécute l'action. */
-  | { type: 'content/perform'; step: ElementStep; timeoutMs: number };
+  /**
+   * Localise la cible de l'étape (en attendant au plus `timeoutMs`) puis exécute l'action.
+   * `confirmed` : un humain a validé l'étape ; sinon la page refuse une action qu'elle juge irréversible.
+   */
+  | { type: 'content/perform'; step: ElementStep; timeoutMs: number; confirmed: boolean }
+  /** Annule l'action en cours (arrêt du replay pendant l'attente d'un élément). */
+  | { type: 'content/cancel' };
 
 export interface ContentPong {
   type: 'content/pong';
@@ -67,7 +72,7 @@ export const isContentHello = (value: unknown): value is ContentHello => isRecor
 
 export interface ContentEventMessage {
   type: 'recorder/event';
-  event: RecordedEvent;
+  event: PageEvent;
 }
 
 const COMMAND_TYPES: ReadonlySet<string> = new Set<CommandType>([
@@ -94,7 +99,9 @@ export function isContentRequest(value: unknown): value is ContentRequest {
     case 'content/record':
       return typeof value.recording === 'boolean';
     case 'content/perform':
-      return isRecord(value.step) && isFiniteNumber(value.timeoutMs);
+      return isRecord(value.step) && isFiniteNumber(value.timeoutMs) && typeof value.confirmed === 'boolean';
+    case 'content/cancel':
+      return true;
     default:
       return false;
   }
@@ -111,9 +118,11 @@ export function isContentPong(value: unknown): value is ContentPong {
 }
 
 /** Valide un message de capture et son événement ; `null` si invalide. */
-export function parseContentEvent(value: unknown): RecordedEvent | null {
+export function parseContentEvent(value: unknown): PageEvent | null {
   if (!isRecord(value) || value.type !== 'recorder/event') return null;
-  const event = parseRecordedEvent(value.event);
+  const raw = value.event;
+  if (isRecord(raw) && raw.kind === 'leave') return isFiniteNumber(raw.at) ? { kind: 'leave', at: raw.at } : null;
+  const event = parseRecordedEvent(raw);
   return event.ok ? event.value : null;
 }
 

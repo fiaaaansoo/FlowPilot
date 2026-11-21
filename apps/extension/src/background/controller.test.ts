@@ -85,6 +85,29 @@ describe('SessionController — enregistrement', () => {
     expect(await sessions.getDraft()).toBeNull();
   });
 
+  it('assainit les URL avant de les stocker et date la navigation à sa réception', async () => {
+    setup({ tab: { id: 7, url: 'http://localhost:5173/?session=abc&q=1' } });
+    await controller.handle({ type: 'record/start' });
+    expect(env.armedOrigin).toBe('http://localhost:5173');
+    await controller.recordEvents(7, [{ kind: 'click', at: clock + 10, target: target('Lien') }]);
+    await controller.recordNavigation(7, 'http://localhost:5173/reset?token=s3cr3t#access_token=x', clock + 20);
+    expect((await sessions.getDraft())?.events.at(-1)).toEqual({ kind: 'navigation', at: clock, url: 'http://localhost:5173/reset' });
+    await controller.handle({ type: 'session/stop' });
+    expect(env.armedOrigin).toBeNull();
+    const workflow = await onlyWorkflow();
+    expect(JSON.stringify(workflow)).not.toMatch(/s3cr3t|session=abc|access_token/);
+    expect(workflow.steps[0]).toMatchObject({ kind: 'navigate', url: 'http://localhost:5173/?q=1' });
+  });
+
+  it('un échec de sauvegarde libère la session, signale l’erreur et garde le brouillon', async () => {
+    await controller.handle({ type: 'record/start' });
+    workflows.save = () => Promise.reject(new Error('QUOTA_BYTES quota exceeded'));
+    const response = await controller.handle({ type: 'session/stop' });
+    expectError(response, 'INTERNAL');
+    expect(await sessions.getSession()).toEqual(IDLE);
+    expect(await sessions.getDraft()).not.toBeNull();
+  });
+
   it('ignore les événements d’un autre onglet que celui enregistré', async () => {
     await controller.handle({ type: 'record/start' });
     await controller.recordEvents(99, [{ kind: 'click', at: clock, target: target('Ailleurs') }]);
@@ -261,6 +284,20 @@ describe('SessionController — replay', () => {
     await controller.settled();
     expect((await runs.list())[0]).toMatchObject({ outcome: 'aborted' });
     expect(await sessions.getSession()).toEqual(IDLE);
+  });
+
+  it('refuse un nouveau replay tant que le précédent, arrêté, n’a pas fini son étape', async () => {
+    const id = await recordOnce();
+    const gate = deferred<Result<void>>();
+    env.navigateImpl = () => gate.promise;
+    await controller.handle({ type: 'replay/start', workflowId: id });
+    await controller.handle({ type: 'session/stop' });
+    expectError(await controller.handle({ type: 'replay/start', workflowId: id }), 'INVALID_TRANSITION');
+    gate.resolve(fail('NAVIGATION_FAILED', 'Exécution arrêtée.'));
+    await controller.settled();
+    env.navigateImpl = () => Promise.resolve(ok(undefined));
+    expect((await controller.handle({ type: 'replay/start', workflowId: id })).ok).toBe(true);
+    await controller.settled();
   });
 
   it('refuse un workflow inconnu, ou dont le site n’est plus autorisé', async () => {

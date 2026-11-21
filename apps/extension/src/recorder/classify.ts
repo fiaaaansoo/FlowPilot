@@ -35,8 +35,13 @@ export function isIgnoredField(el: Element): boolean {
   return el instanceof HTMLInputElement && ['hidden', 'file'].includes(el.type);
 }
 
+/**
+ * Racines de verbes (toutes conjugaisons : « Confirmez », « Je confirme »,
+ * « Payez maintenant », « Submit application »...). Une confirmation de trop
+ * coûte peu ; une action irréversible rejouée sans accord coûte cher.
+ */
 const IRREVERSIBLE =
-  /\b(envoyer|payer|paiement|acheter|commander|supprimer|effacer|publier|postuler|confirmer|souscrire|r(é|e)server|virement|transf(é|e)rer|valider (la|ma) commande|delete|remove|pay|purchase|buy|order|send|publish|apply|confirm|checkout|subscribe|transfer|place order)\b/i;
+  /(^|[^\p{L}])(envo[iy]|pa[yi]|paiement|achat|achet|command|supprim|effac|publi|postul|confirm|souscri|r[ée]serv|virement|transf[ée]r|valid|soum[ei]|d[ée]pos|r[ée]sili|annul|delete|remov|purchas|buy|order|send|submit|publish|apply|checkout|subscri|transfer|cancel|book)/iu;
 
 /**
  * Action potentiellement irréversible (envoi, paiement, suppression, publication) :

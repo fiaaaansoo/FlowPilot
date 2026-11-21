@@ -41,7 +41,7 @@ describe('protocole content script', () => {
   it('reconnaît les requêtes et le pong versionné', () => {
     expect(isContentRequest({ type: 'content/ping' })).toBe(true);
     expect(isContentRequest({ type: 'content/record', recording: true })).toBe(true);
-    expect(isContentRequest({ type: 'content/perform', step: { id: 's' }, timeoutMs: 100 })).toBe(true);
+    expect(isContentRequest({ type: 'content/perform', step: { id: 's' }, timeoutMs: 100, confirmed: false })).toBe(true);
     expect(isContentRequest({ type: 'content/record' })).toBe(false);
     expect(isContentRequest({ type: 'other' })).toBe(false);
     const pong = { type: 'content/pong', protocolVersion: PROTOCOL_VERSION, url: 'http://x/', recording: false };

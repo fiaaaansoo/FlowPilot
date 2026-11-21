@@ -66,7 +66,7 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse: Re
 // les sites autorisés (pas de permission `tabs`) ; il couvre aussi les
 // changements d'URL des applications SPA (`history.pushState`).
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.url) void controller.recordNavigation(tabId, changeInfo.url);
+  if (changeInfo.url) void controller.recordNavigation(tabId, changeInfo.url, Date.now());
   if (changeInfo.status === 'complete') void controller.onTabLoaded(tabId, tab.url);
 });
 

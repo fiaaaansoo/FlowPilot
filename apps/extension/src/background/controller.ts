@@ -1,15 +1,18 @@
 import {
+  errorMessage,
   fail as err,
   failedRun,
   isSupportedUrl,
   ok,
   originOf,
+  sanitizeUrl,
   transition,
   workflowFromDraft,
   type Command,
   type CommandResponse,
   type ContentPong,
   type ElementStep,
+  type PageEvent,
   type RecordedEvent,
   type Result,
   type RunSummary,
@@ -44,7 +47,7 @@ export interface BrowserEnv {
   /** Attend que l'onglet atteigne `url`, puis reconnecte le content script. */
   waitForNavigation(tabId: number, url: string, signal: AbortSignal): Promise<Result<void>>;
   /** Exécute une étape sur un élément de la page (grounding + action + vérification). */
-  perform(tabId: number, step: ElementStep, signal: AbortSignal): Promise<Result<{ strategy: string }>>;
+  perform(tabId: number, step: ElementStep, signal: AbortSignal, confirmed: boolean): Promise<Result<{ strategy: string }>>;
   setIndicator(status: SessionStatus): Promise<void>;
 }
 
@@ -105,7 +108,7 @@ export class SessionController {
   }
 
   /** Interactions capturées par le content script de `tabId`. Ignorées hors de l'onglet enregistré. */
-  recordEvents(tabId: number, events: readonly RecordedEvent[]): Promise<void> {
+  recordEvents(tabId: number, events: readonly PageEvent[]): Promise<void> {
     return this.exclusive(async () => {
       const session = await this.deps.sessions.getSession();
       if (session.status !== 'recording' || session.tabId !== tabId) return;
@@ -113,12 +116,16 @@ export class SessionController {
     });
   }
 
-  /** Changement d'URL de l'onglet (chargement complet ou navigation SPA). */
-  recordNavigation(tabId: number, url: string): Promise<void> {
+  /**
+   * Changement d'URL de l'onglet (chargement complet ou navigation SPA). `at` est
+   * pris à la réception de l'événement Chrome, pas après l'attente dans la file.
+   * L'URL est assainie (jetons, codes, fragments OAuth) avant tout stockage.
+   */
+  recordNavigation(tabId: number, url: string, at: number = this.deps.now()): Promise<void> {
     return this.exclusive(async () => {
       const session = await this.deps.sessions.getSession();
       if (session.status !== 'recording' || session.tabId !== tabId || !isSupportedUrl(url)) return;
-      await this.appendToDraft([{ kind: 'navigation', at: this.deps.now(), url }]);
+      await this.appendToDraft([{ kind: 'navigation', at, url: sanitizeUrl(url) }]);
     });
   }
 
@@ -138,7 +145,8 @@ export class SessionController {
     return this.exclusive(async () => {
       const session = await this.deps.sessions.getSession();
       if (session.status === 'recording' && session.tabId === tabId) {
-        await this.saveDraft();
+        const saved = await this.saveDraft();
+        if (!saved.ok) console.error('[FlowPilot]', saved.error.message);
         await this.applyEvent(session, { type: 'STOPPED' });
       } else if (session.status === 'replaying' && session.tabId === tabId) {
         this.activeRun?.abort.abort();
@@ -212,7 +220,7 @@ export class SessionController {
     await env.armRecorder(origin);
 
     const startedAt = now();
-    const draft = createDraft({ workflowId: newId(), origin, startUrl: tab.url, startedAt });
+    const draft = createDraft({ workflowId: newId(), origin, startUrl: sanitizeUrl(tab.url), startedAt });
     await sessions.setDraft(draft);
     return this.applyEvent(session, { type: 'RECORD_STARTED', tabId: tab.id, origin, workflowId: draft.workflowId, startedAt });
   }
@@ -223,12 +231,20 @@ export class SessionController {
     await this.deps.sessions.setDraft(appendEvents(draft, events, this.deps.now()));
   }
 
-  /** Compile le brouillon en workflow et le sauvegarde (s'il contient plus que la page de départ ou rien). */
-  private async saveDraft(): Promise<void> {
+  /**
+   * Compile le brouillon en workflow et le sauvegarde. Le brouillon n'est effacé
+   * qu'après une sauvegarde réussie : rien n'est perdu si le stockage échoue.
+   */
+  private async saveDraft(): Promise<Result<void>> {
     await this.deps.env.disarmRecorder();
     const draft = await this.deps.sessions.getDraft();
-    if (draft) await this.deps.workflows.save(workflowFromDraft(draft, defaultWorkflowName(draft.origin)));
+    try {
+      if (draft) await this.deps.workflows.save(workflowFromDraft(draft, defaultWorkflowName(draft.origin)));
+    } catch (error) {
+      return err('INTERNAL', `Le workflow n’a pas pu être sauvegardé : ${errorMessage(error)}`);
+    }
     await this.deps.sessions.clearDraft();
+    return ok(undefined);
   }
 
   private async stop(): Promise<Result<SessionState>> {
@@ -238,7 +254,10 @@ export class SessionController {
       // Saisies tapées mais pas encore validées : récupérées avant de couper la capture.
       const flushed = await env.setCapture(session.tabId, false);
       if (flushed.ok) await this.appendToDraft(flushed.value);
-      await this.saveDraft();
+      const saved = await this.saveDraft();
+      // La session est libérée quoi qu'il arrive ; l'erreur est remontée au panneau.
+      const stopped = await this.applyEvent(session, { type: 'STOPPED' });
+      return saved.ok ? stopped : saved;
     } else if (session.status === 'replaying') {
       // La boucle s'arrête au prochain contrôle du signal et enregistre un run « aborted ».
       this.activeRun?.abort.abort();
@@ -253,6 +272,8 @@ export class SessionController {
     const session = await sessions.getSession();
     const idle = requireIdle(session, 'rejouer');
     if (!idle.ok) return idle;
+    // Un replay arrêté peut encore finir son étape en cours : pas de second run sur l'onglet.
+    if (this.activeRun) return err('INVALID_TRANSITION', 'Le replay précédent se termine, réessayez dans un instant.');
 
     const workflow = await workflows.get(workflowId);
     if (!workflow) return err('WORKFLOW_NOT_FOUND', 'Workflow introuvable (supprimé ou illisible).');
@@ -279,7 +300,7 @@ export class SessionController {
       {
         navigate: (url, signal) => env.navigate(tabId, url, signal),
         waitForNavigation: (url, signal) => env.waitForNavigation(tabId, url, signal),
-        perform: (step, signal) => env.perform(tabId, step, signal),
+        perform: (step, signal, confirmed) => env.perform(tabId, step, signal, confirmed),
         requestHuman: (stepIndex, signal) => this.requestHuman(run, stepIndex, signal),
       },
       {

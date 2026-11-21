@@ -20,8 +20,12 @@ export interface StepDriver {
   navigate(url: string, signal: AbortSignal): Promise<Result<void>>;
   /** Attend que l'onglet atteigne `url` (navigation déclenchée par l'étape précédente). */
   waitForNavigation(url: string, signal: AbortSignal): Promise<Result<void>>;
-  /** Localise la cible dans la page et exécute l'action ; renvoie la stratégie de grounding. */
-  perform(step: ElementStep, signal: AbortSignal): Promise<Result<{ strategy: string }>>;
+  /**
+   * Localise la cible dans la page et exécute l'action ; renvoie la stratégie de grounding.
+   * `confirmed` : un humain a validé l'étape ; sinon la page refuse (`CONFIRMATION_REQUIRED`)
+   * une action qu'elle juge irréversible sur l'élément effectivement trouvé.
+   */
+  perform(step: ElementStep, signal: AbortSignal, confirmed: boolean): Promise<Result<{ strategy: string }>>;
   /**
    * Attend l'intervention humaine (confirmation ou saisie manuelle) sur l'étape.
    * `false` si le run est arrêté entre-temps.
@@ -36,7 +40,7 @@ export interface RunOptions {
 }
 
 type StepResult = Result<{ strategy?: string }>;
-type Handler<S extends WorkflowStep> = (step: S, driver: StepDriver, signal: AbortSignal) => Promise<StepResult>;
+type Handler<S extends WorkflowStep> = (step: S, driver: StepDriver, signal: AbortSignal, confirmed: boolean) => Promise<StepResult>;
 type StepHandlers = { [K in WorkflowStep['kind']]: Handler<Extract<WorkflowStep, { kind: K }>> };
 
 const withoutStrategy = async (result: Promise<Result<void>>): Promise<StepResult> => {
@@ -44,7 +48,7 @@ const withoutStrategy = async (result: Promise<Result<void>>): Promise<StepResul
   return r.ok ? { ok: true, value: {} } : r;
 };
 
-const perform: Handler<ElementStep> = (step, driver, signal) => driver.perform(step, signal);
+const perform: Handler<ElementStep> = (step, driver, signal, confirmed) => driver.perform(step, signal, confirmed);
 
 /** Un handler par type d'étape : ajouter un `kind` au schéma impose d'ajouter son handler (erreur de compilation sinon). */
 const HANDLERS: StepHandlers = {
@@ -55,11 +59,12 @@ const HANDLERS: StepHandlers = {
   manualInput: perform,
   select: perform,
   check: perform,
+  press: perform,
   submit: perform,
 };
 
-const runHandler = (step: WorkflowStep, driver: StepDriver, signal: AbortSignal): Promise<StepResult> =>
-  (HANDLERS[step.kind] as Handler<WorkflowStep>)(step, driver, signal);
+const runHandler = (step: WorkflowStep, driver: StepDriver, signal: AbortSignal, confirmed: boolean): Promise<StepResult> =>
+  (HANDLERS[step.kind] as Handler<WorkflowStep>)(step, driver, signal, confirmed);
 
 /** Lecture fraîche du signal (il peut changer pendant un `await`, ce que le flux de types ignore). */
 const isAborted = (signal: AbortSignal): boolean => signal.aborted;
@@ -97,9 +102,17 @@ export async function runWorkflow(workflow: Workflow, driver: StepDriver, option
     try {
       await onStepStart?.(index);
       if (isAborted(signal)) return abortAt(index, step, stepStart);
-      if (needsHuman(step) && !(await driver.requestHuman(index, signal))) return abortAt(index, step, stepStart);
+      let confirmed = needsHuman(step);
+      if (confirmed && !(await driver.requestHuman(index, signal))) return abortAt(index, step, stepStart);
       if (isAborted(signal)) return abortAt(index, step, stepStart);
-      result = await runHandler(step, driver, signal);
+      result = await runHandler(step, driver, signal, confirmed);
+      // La page juge l'élément trouvé irréversible alors que l'étape n'était pas marquée :
+      // on demande l'accord humain, puis on réessaie une seule fois.
+      if (!result.ok && result.error.code === 'CONFIRMATION_REQUIRED' && !confirmed) {
+        if (!(await driver.requestHuman(index, signal))) return abortAt(index, step, stepStart);
+        confirmed = true;
+        result = await runHandler(step, driver, signal, confirmed);
+      }
     } catch (error) {
       result = fail('INTERNAL', errorMessage(error));
     }

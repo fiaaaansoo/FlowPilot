@@ -1,4 +1,4 @@
-import { LIMITS, type ElementTarget } from '@flowpilot/shared';
+import { LIMITS, sanitizeUrl, type ElementTarget } from '@flowpilot/shared';
 
 /**
  * Lecture du DOM pour le grounding : rôle et nom accessibles (sous-ensemble
@@ -160,13 +160,67 @@ export function stableAttributes(el: Element): Record<string, string> {
   if (id && isStableId(id)) attributes.id = id;
   for (const name of STABLE_ATTRIBUTES) {
     const value = el.getAttribute(name);
-    if (value !== null && value !== '') attributes[name] = value.slice(0, LIMITS.attributeValue);
+    if (value === null || value === '') continue;
+    // Un lien peut porter un jeton (réinitialisation, OAuth) : jamais stocké.
+    const safe = name === 'href' ? sanitizeHref(el, value) : value;
+    attributes[name] = safe.slice(0, LIMITS.attributeValue);
   }
   if (el instanceof HTMLInputElement && ['checkbox', 'radio', 'submit', 'button', 'reset'].includes(el.type)) {
     const value = el.getAttribute('value');
     if (value) attributes.value = value.slice(0, LIMITS.attributeValue);
   }
   return Object.fromEntries(Object.entries(attributes).slice(0, LIMITS.attributes));
+}
+
+/** `href` tel quel s'il ne porte pas de secret, sinon sa forme absolue assainie. */
+function sanitizeHref(el: Element, href: string): string {
+  try {
+    const absolute = new URL(href, el.ownerDocument.baseURI).href;
+    const clean = sanitizeUrl(absolute);
+    return clean === absolute ? href : clean;
+  } catch {
+    return href;
+  }
+}
+
+/**
+ * Le lien `el` pointe-t-il vers le `href` enregistré ? Comparaison des URL
+ * résolues et assainies, insensible à la forme relative ou absolue de l'attribut.
+ */
+export function hrefMatches(el: Element, recorded: string): boolean {
+  const live = el.getAttribute('href');
+  if (live === null) return false;
+  try {
+    const base = el.ownerDocument.baseURI;
+    return sanitizeUrl(new URL(live, base).href) === sanitizeUrl(new URL(recorded, base).href);
+  } catch {
+    return live === recorded;
+  }
+}
+
+/** Conteneurs de « ligne » : élément de liste, rangée de tableau, carte. */
+export const ROW_CONTAINER = 'li, tr, [role="row"], [role="listitem"], article';
+
+/** D'autres éléments de la page ont-ils le même rôle et le même nom accessible ? */
+function hasHomonyms(el: Element, role: string | undefined, name: string): boolean {
+  if (!name) return false;
+  const tag = el.tagName.toLowerCase();
+  let count = 0;
+  for (const other of Array.from(el.ownerDocument.querySelectorAll(`${tag}, [role]`))) {
+    if (roleOf(other) === role && accessibleName(other) === name && ++count > 1) return true;
+  }
+  return false;
+}
+
+/**
+ * Texte de la ligne qui contient l'élément, s'il en a une. Sert à distinguer des
+ * boutons identiques (« Supprimer », « Voir ») sans dépendre de leur position.
+ */
+export function rowContext(el: Element): string | undefined {
+  const row = el.parentElement?.closest(ROW_CONTAINER);
+  if (!row) return undefined;
+  const text = normalizeText(textOf(row));
+  return text || undefined;
 }
 
 /** `CSS.escape` (absent de jsdom) pour un identifiant. */
@@ -218,11 +272,14 @@ export function describeElement(el: Element): ElementTarget {
   const role = roleOf(el);
   const name = accessibleName(el);
   const text = isField ? '' : normalizeText(textOf(el));
+  // Le contexte ne sert qu'à départager des homonymes : inutile (et bruité) pour un élément unique.
+  const context = hasHomonyms(el, role, name) ? rowContext(el) : undefined;
   return {
     tag: el.tagName.toLowerCase(),
     ...(role ? { role } : {}),
     ...(name ? { name } : {}),
     ...(text && text !== name ? { text } : {}),
+    ...(context ? { context } : {}),
     attributes: stableAttributes(el),
     css: uniqueSelector(el),
   };

@@ -40,7 +40,12 @@ export interface ElementTarget {
   text?: string;
   /** Attributs jugés stables : id non généré, name, data-testid, aria-label, placeholder, type, href... */
   attributes: Record<string, string>;
-  /** Sélecteur CSS unique au moment de l'enregistrement. */
+  /**
+   * Texte de la ligne qui contient l'élément (élément de liste, rangée, carte) :
+   * distingue des boutons identiques d'une liste sans dépendre de leur position.
+   */
+  context?: string;
+  /** Sélecteur CSS unique au moment de l'enregistrement (indice fragile : position). */
   css: string;
 }
 
@@ -93,6 +98,13 @@ export interface CheckStep extends StepBase {
   checked: boolean;
 }
 
+/** Touche Entrée dans un champ hors formulaire (recherche d'application monopage). */
+export interface PressStep extends StepBase {
+  kind: 'press';
+  target: ElementTarget;
+  key: 'Enter';
+}
+
 /** Soumission d'un formulaire sans clic sur un bouton (touche Entrée). */
 export interface SubmitStep extends StepBase {
   kind: 'submit';
@@ -108,6 +120,7 @@ export type WorkflowStep =
   | ManualInputStep
   | SelectStep
   | CheckStep
+  | PressStep
   | SubmitStep;
 
 export type StepKind = WorkflowStep['kind'];
@@ -142,13 +155,14 @@ const isBoundedString = (value: unknown, max: number): value is string => typeof
 
 function parseTarget(raw: unknown, index: number): Parsed<ElementTarget> {
   if (!isRecord(raw)) return invalid(index, 'cible attendue.');
-  const { tag, role, name, text, attributes, css } = raw;
+  const { tag, role, name, text, context, attributes, css } = raw;
   if (!isNonEmptyString(tag) || !/^[a-z][a-z0-9-]*$/.test(tag)) return invalid(index, 'balise de la cible invalide.');
   if (!isNonEmptyString(css) || css.length > LIMITS.css) return invalid(index, 'sélecteur CSS de la cible invalide.');
   for (const [label, value] of [
     ['rôle', role],
     ['nom', name],
     ['texte', text],
+    ['contexte', context],
   ] as const) {
     if (value !== undefined && !isBoundedString(value, LIMITS.text)) return invalid(index, `${label} de la cible invalide.`);
   }
@@ -167,6 +181,7 @@ function parseTarget(raw: unknown, index: number): Parsed<ElementTarget> {
     ...(typeof role === 'string' && role ? { role } : {}),
     ...(typeof name === 'string' && name ? { name } : {}),
     ...(typeof text === 'string' && text ? { text } : {}),
+    ...(typeof context === 'string' && context ? { context } : {}),
     attributes: cleanAttributes,
     css,
   });
@@ -190,7 +205,7 @@ export function parseWorkflowStep(raw: unknown, index: number): Result<WorkflowS
   const target = parseTarget(raw.target, index);
   if (!target.ok) {
     // Type inconnu : message plus utile que « cible attendue ».
-    if (!['click', 'input', 'manualInput', 'select', 'check', 'submit'].includes(String(kind))) {
+    if (!['click', 'input', 'manualInput', 'select', 'check', 'press', 'submit'].includes(String(kind))) {
       return invalid(index, `type « ${String(kind)} » inconnu.`);
     }
     return target;
@@ -214,6 +229,9 @@ export function parseWorkflowStep(raw: unknown, index: number): Result<WorkflowS
     case 'check':
       if (typeof raw.checked !== 'boolean') return invalid(index, 'état coché attendu.');
       return ok({ id, kind, target: target.value, checked: raw.checked });
+    case 'press':
+      if (raw.key !== 'Enter') return invalid(index, 'seule la touche Entrée est prise en charge.');
+      return ok({ id, kind, target: target.value, key: raw.key });
     default:
       return invalid(index, `type « ${String(kind)} » inconnu.`);
   }
@@ -262,11 +280,18 @@ export function parseWorkflow(raw: unknown): Result<Workflow> {
 
 // --- Affichage --------------------------------------------------------------
 
-/** Libellé court d'une cible : nom accessible, puis texte, puis attribut parlant, puis balise. */
+/**
+ * Libellé court d'une cible : nom accessible, puis texte, puis attribut parlant,
+ * puis balise ; suivi de la ligne qui la contient, pour savoir laquelle parmi
+ * des éléments identiques (indispensable avant de confirmer une action).
+ */
 export function targetLabel(target: ElementTarget): string {
   const label =
     target.name ?? target.text ?? target.attributes['aria-label'] ?? target.attributes.placeholder ?? target.attributes.name;
-  return label ? `« ${label} »` : `<${target.tag}>`;
+  const base = label ? `« ${label} »` : `<${target.tag}>`;
+  if (!target.context || target.context === label) return base;
+  const context = target.context.length > 60 ? `${target.context.slice(0, 59)}…` : target.context;
+  return `${base} (ligne « ${context} »)`;
 }
 
 const pathOf = (url: string): string => {
@@ -295,6 +320,8 @@ export function describeStep(step: WorkflowStep): string {
       return `Choisir « ${step.label ?? step.value} » dans ${targetLabel(step.target)}`;
     case 'check':
       return `${step.checked ? 'Cocher' : 'Décocher'} ${targetLabel(step.target)}`;
+    case 'press':
+      return `Appuyer sur Entrée dans ${targetLabel(step.target)}`;
     case 'submit':
       return `Valider le formulaire ${targetLabel(step.target)}`;
   }

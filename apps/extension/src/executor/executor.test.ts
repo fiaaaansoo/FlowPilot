@@ -90,6 +90,23 @@ describe('runWorkflow', () => {
     expect(d.order).toEqual(['manualInput Mot de passe']);
   });
 
+  it('si la page juge l’élément irréversible, demande l’accord humain puis réessaie confirmé', async () => {
+    const calls: boolean[] = [];
+    const requestHuman = vi.fn(() => Promise.resolve(true));
+    const d = driver({
+      requestHuman,
+      perform: (_step, _signal, confirmed) => {
+        calls.push(confirmed);
+        return Promise.resolve(confirmed ? ok({ strategy: 'role' }) : fail('CONFIRMATION_REQUIRED', 'irréversible'));
+      },
+    });
+    const flow = makeWorkflow([{ id: 'x', kind: 'click', target: target('Payez') }]);
+    const summary = await runWorkflow(flow, d, { signal: signal(), now });
+    expect(calls).toEqual([false, true]);
+    expect(requestHuman).toHaveBeenCalledOnce();
+    expect(summary.outcome).toBe('succeeded');
+  });
+
   it('un refus humain (arrêt) n’exécute pas l’action', async () => {
     const d = driver({ requestHuman: () => Promise.resolve(false) });
     const confirmFlow = makeWorkflow([{ id: 'x', kind: 'submit', target: target('form', { tag: 'form' }), confirm: true }]);

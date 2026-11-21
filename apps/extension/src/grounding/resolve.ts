@@ -1,26 +1,31 @@
 import { fail, ok, type ElementTarget, type Result } from '@flowpilot/shared';
-import { TEST_ID_ATTRIBUTES, accessibleName, cssString, isVisible, normalizeText, roleOf } from './dom';
+import { TEST_ID_ATTRIBUTES, accessibleName, cssString, hrefMatches, isVisible, normalizeText, roleOf, rowContext } from './dom';
 
 /**
- * Grounding déterministe : retrouve l'élément décrit par une `ElementTarget`.
+ * Grounding déterministe : retrouve l'élément décrit par une `ElementTarget`,
+ * ou refuse.
  *
- * Chaque stratégie produit un ensemble de candidats visibles. Les stratégies
- * sans résultat sont ignorées (indice devenu obsolète). L'élément retenu est
- * l'intersection des autres : elle doit contenir exactement un élément.
- * - plusieurs éléments : `TARGET_AMBIGUOUS` (jamais de choix arbitraire) ;
- * - stratégies en désaccord : on se replie sur les stratégies fortes
- *   (identifiants, rôle + nom, attributs) ; si elles divergent aussi, ambiguïté ;
- * - rien de visible : `TARGET_NOT_INTERACTABLE` si un candidat masqué existe,
- *   `TARGET_NOT_FOUND` sinon.
+ * 1. Indices forts (identifiant de test, id, rôle + nom, attributs) : chacun
+ *    produit des candidats visibles ; ceux qui ne trouvent rien sont ignorés,
+ *    l'élément retenu est dans l'intersection des autres. S'ils divergent :
+ *    `TARGET_AMBIGUOUS`.
+ * 2. Plusieurs candidats forts : départagés seulement par la ligne qui les
+ *    contient (`context`), jamais par la position (CSS) ni par le texte, qui
+ *    désigneraient l'élément situé au même endroit après un changement de liste.
+ * 3. Indices fragiles (CSS, texte) : utilisés seuls uniquement si la cible
+ *    n'avait aucun indice fort. Si des indices forts existaient mais ne trouvent
+ *    plus rien, l'élément a changé : `TARGET_NOT_FOUND` (le Recovery Agent du
+ *    Sprint 3 prendra le relais), plutôt qu'un clic sur ce qui occupe sa place.
  *
- * Le grounding sémantique (Sprint 3) interviendra seulement après un échec ici.
+ * Rien de visible : `TARGET_NOT_INTERACTABLE` si un candidat masqué existe,
+ * `TARGET_NOT_FOUND` sinon.
  */
 
-export type StrategyName = 'testid' | 'id' | 'role' | 'attributes' | 'css' | 'text';
+export type StrategyName = 'testid' | 'id' | 'role' | 'attributes' | 'context' | 'css' | 'text';
 
 interface Strategy {
   name: StrategyName;
-  strong: boolean;
+  /** `null` : la cible n'a pas l'indice nécessaire (stratégie non applicable). */
   find: (target: ElementTarget, root: ParentNode) => Element[] | null;
 }
 
@@ -32,12 +37,11 @@ const safeQuery = (root: ParentNode, selector: string): Element[] => {
   }
 };
 
-const ROLE_SCAN = 'a, button, input, select, textarea, [role], summary, h1, h2, h3, h4, h5, h6, li, option, img, form, nav';
+const ROLE_SCAN = 'a, button, input, select, textarea, [role], summary, h1, h2, h3, h4, h5, h6, li, option, img, form, nav, [tabindex], [onclick]';
 
-const STRATEGIES: readonly Strategy[] = [
+const STRONG: readonly Strategy[] = [
   {
     name: 'testid',
-    strong: true,
     find: (target, root) => {
       const attr = TEST_ID_ATTRIBUTES.find((name) => target.attributes[name]);
       return attr ? safeQuery(root, `[${attr}=${cssString(target.attributes[attr] ?? '')}]`) : null;
@@ -45,12 +49,10 @@ const STRATEGIES: readonly Strategy[] = [
   },
   {
     name: 'id',
-    strong: true,
     find: (target, root) => (target.attributes.id ? safeQuery(root, `[id=${cssString(target.attributes.id)}]`) : null),
   },
   {
     name: 'role',
-    strong: true,
     find: (target, root) => {
       if (!target.role || !target.name) return null;
       const name = normalizeText(target.name);
@@ -59,23 +61,26 @@ const STRATEGIES: readonly Strategy[] = [
   },
   {
     name: 'attributes',
-    strong: true,
     find: (target, root) => {
       // Combinaison d'attributs discriminants (hors identifiants déjà testés).
-      const keys = ['name', 'type', 'value', 'aria-label', 'placeholder', 'href', 'for'].filter((k) => target.attributes[k]);
-      if (!keys.some((k) => k !== 'type')) return null;
+      const keys = ['name', 'type', 'value', 'aria-label', 'placeholder', 'for'].filter((k) => target.attributes[k]);
+      const href = target.attributes.href;
+      if (!href && !keys.some((k) => k !== 'type')) return null;
       const selector = target.tag + keys.map((k) => `[${k}=${cssString(target.attributes[k] ?? '')}]`).join('');
-      return safeQuery(root, selector);
+      const found = safeQuery(root, href ? `${selector}[href]` : selector);
+      // Un lien est comparé par son URL résolue : forme relative ou absolue indifférente.
+      return href ? found.filter((el) => hrefMatches(el, href)) : found;
     },
   },
+];
+
+const WEAK: readonly Strategy[] = [
   {
     name: 'css',
-    strong: false,
     find: (target, root) => safeQuery(root, target.css).filter((el) => el.tagName.toLowerCase() === target.tag),
   },
   {
     name: 'text',
-    strong: false,
     find: (target, root) => {
       const text = target.text ?? target.name;
       if (!text || ['input', 'select', 'textarea'].includes(target.tag)) return null;
@@ -87,13 +92,29 @@ const STRATEGIES: readonly Strategy[] = [
 
 export interface Resolution {
   element: Element;
-  /** Stratégie qui désigne seule l'élément, ou `combined` si seule l'intersection y parvient. */
+  /** Stratégie qui désigne seule l'élément, `context` si la ligne a départagé, `combined` si seule l'intersection y parvient. */
   strategy: StrategyName | 'combined';
 }
 
-interface StrategyResult {
-  strategy: Strategy;
-  visible: Element[];
+interface Evaluated {
+  /** Au moins une stratégie de ce groupe était applicable à la cible. */
+  applicable: boolean;
+  /** Résultats visibles non vides, par stratégie. */
+  results: { name: StrategyName; visible: Element[] }[];
+  hiddenMatch: boolean;
+}
+
+function evaluate(strategies: readonly Strategy[], target: ElementTarget, root: ParentNode): Evaluated {
+  const evaluated: Evaluated = { applicable: false, results: [], hiddenMatch: false };
+  for (const strategy of strategies) {
+    const matches = strategy.find(target, root);
+    if (matches === null) continue;
+    evaluated.applicable = true;
+    const visible = matches.filter(isVisible);
+    if (matches.length > visible.length) evaluated.hiddenMatch = true;
+    if (visible.length > 0) evaluated.results.push({ name: strategy.name, visible });
+  }
+  return evaluated;
 }
 
 const intersect = (sets: Element[][]): Element[] => {
@@ -102,38 +123,43 @@ const intersect = (sets: Element[][]): Element[] => {
   return first.filter((el) => rest.every((set) => set.includes(el)));
 };
 
+const soleStrategy = (results: Evaluated['results'], element: Element): StrategyName | 'combined' =>
+  results.find((r) => r.visible.length === 1 && r.visible[0] === element)?.name ?? 'combined';
+
 export function resolveTarget(target: ElementTarget, root: ParentNode = document): Result<Resolution> {
-  const results: StrategyResult[] = [];
-  let hiddenMatch = false;
-  for (const strategy of STRATEGIES) {
-    const matches = strategy.find(target, root);
-    if (matches === null) continue;
-    const visible = matches.filter(isVisible);
-    if (matches.length > visible.length) hiddenMatch = true;
-    if (visible.length > 0) results.push({ strategy, visible });
-  }
+  const strong = evaluate(STRONG, target, root);
 
-  if (results.length === 0) {
-    return hiddenMatch
-      ? fail('TARGET_NOT_INTERACTABLE', `${label(target)} est présent mais masqué.`)
-      : fail('TARGET_NOT_FOUND', `${label(target)} est introuvable dans la page.`);
-  }
-
-  let candidates = intersect(results.map((r) => r.visible));
-  if (candidates.length === 0) {
-    // Désaccord : les indices fragiles (CSS positionnel, texte) ont pu dériver.
-    candidates = intersect(results.filter((r) => r.strategy.strong).map((r) => r.visible));
-    if (candidates.length !== 1) {
+  if (strong.applicable) {
+    if (strong.results.length === 0) return notFound(target, strong.hiddenMatch);
+    let candidates = intersect(strong.results.map((r) => r.visible));
+    if (candidates.length === 0) {
       return fail('TARGET_AMBIGUOUS', `Les indices de ${label(target)} désignent des éléments différents.`);
     }
+    if (candidates.length === 1 && candidates[0]) {
+      return ok({ element: candidates[0], strategy: soleStrategy(strong.results, candidates[0]) });
+    }
+    // Plusieurs candidats : seule la ligne qui les contient peut les départager.
+    if (target.context) {
+      const wanted = normalizeText(target.context);
+      const inRow = candidates.filter((el) => rowContext(el) === wanted);
+      if (inRow.length === 1 && inRow[0]) return ok({ element: inRow[0], strategy: 'context' });
+      if (inRow.length === 0) {
+        return fail('TARGET_NOT_FOUND', `${label(target)} n’est plus dans la ligne enregistrée (« ${target.context} »).`);
+      }
+      candidates = inRow;
+    }
+    return ambiguous(target, candidates.length);
   }
-  if (candidates.length > 1) {
-    return fail('TARGET_AMBIGUOUS', `${candidates.length} éléments correspondent à ${label(target)}.`);
+
+  // Aucun indice fort enregistré : les indices fragiles doivent concorder.
+  const weak = evaluate(WEAK, target, root);
+  if (weak.results.length === 0) return notFound(target, weak.hiddenMatch);
+  const candidates = intersect(weak.results.map((r) => r.visible));
+  if (candidates.length === 1 && candidates[0]) {
+    return ok({ element: candidates[0], strategy: soleStrategy(weak.results, candidates[0]) });
   }
-  const element = candidates[0];
-  if (!element) return fail('TARGET_NOT_FOUND', `${label(target)} est introuvable dans la page.`);
-  const sole = results.find((r) => r.visible.length === 1 && r.visible[0] === element);
-  return ok({ element, strategy: sole ? sole.strategy.name : 'combined' });
+  if (candidates.length === 0) return fail('TARGET_AMBIGUOUS', `Les indices de ${label(target)} désignent des éléments différents.`);
+  return ambiguous(target, candidates.length);
 }
 
 const label = (target: ElementTarget): string => {
@@ -141,20 +167,32 @@ const label = (target: ElementTarget): string => {
   return text ? `L’élément « ${text} »` : `L’élément <${target.tag}>`;
 };
 
+const notFound = (target: ElementTarget, hidden: boolean): Result<never> =>
+  hidden
+    ? fail('TARGET_NOT_INTERACTABLE', `${label(target)} est présent mais masqué.`)
+    : fail('TARGET_NOT_FOUND', `${label(target)} est introuvable dans la page.`);
+
+const ambiguous = (target: ElementTarget, count: number): Result<never> =>
+  fail('TARGET_AMBIGUOUS', `${count} éléments correspondent à ${label(target)}${target.context ? ' dans la ligne enregistrée' : ''}.`);
+
 /**
  * Attend que la cible soit résolue (éléments chargés en différé). Une
- * ambiguïté est renvoyée tout de suite : attendre ne la lève pas.
+ * ambiguïté est renvoyée tout de suite : attendre ne la lève pas. L'arrêt du
+ * replay (`signal`) interrompt l'attente.
  */
 export async function waitForTarget(
   target: ElementTarget,
   timeoutMs: number,
   root: ParentNode = document,
   intervalMs = 100,
+  signal?: AbortSignal,
 ): Promise<Result<Resolution>> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
+    if (signal?.aborted) return fail('NAVIGATION_FAILED', 'Exécution arrêtée.');
     const result = resolveTarget(target, root);
     if (result.ok || result.error.code === 'TARGET_AMBIGUOUS' || Date.now() >= deadline) return result;
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 }
+

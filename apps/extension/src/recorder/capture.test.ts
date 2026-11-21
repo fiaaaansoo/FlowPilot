@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { RecordedEvent } from '@flowpilot/shared';
+import type { PageEvent } from '@flowpilot/shared';
 import { InteractionCapture } from './capture';
 import { isIrreversibleAction, isSensitiveField } from './classify';
 
@@ -20,7 +20,7 @@ const type = (el: HTMLInputElement, value: string) => {
 };
 const change = (el: Element) => el.dispatchEvent(trusted(new Event('change', { bubbles: true })));
 
-let events: RecordedEvent[];
+let events: PageEvent[];
 let capture: InteractionCapture;
 let clock = 0;
 
@@ -110,11 +110,55 @@ describe('InteractionCapture', () => {
     expect(events[1]).not.toHaveProperty('confirm');
   });
 
-  it('enregistre une soumission par Entrée seulement sans bouton déclencheur', () => {
+  it('soumission par Entrée : « submit » sans bouton, clic du bouton par défaut sinon, jamais en double', () => {
     const form = $<HTMLFormElement>('#search');
+    const button = $('#search button');
     form.dispatchEvent(trusted(new SubmitEvent('submit', { bubbles: true, submitter: null })));
-    form.dispatchEvent(trusted(new SubmitEvent('submit', { bubbles: true, submitter: $('#search button') })));
+    // Entrée avec bouton d'envoi, sans clic capturé : le clic est enregistré depuis le submit.
+    form.dispatchEvent(trusted(new SubmitEvent('submit', { bubbles: true, submitter: button })));
+    // Clic réel sur le bouton puis submit : un seul clic.
+    click(button);
+    form.dispatchEvent(trusted(new SubmitEvent('submit', { bubbles: true, submitter: button })));
+    expect(events.map((e) => e.kind)).toEqual(['submit', 'click', 'click']);
+  });
+
+  it('une liste sensible devient une saisie manuelle, sans valeur', () => {
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<label for="exp">Mois d’expiration</label><select id="exp" autocomplete="cc-exp-month"><option value="">--</option><option value="07">07</option></select>',
+    );
+    const select = $<HTMLSelectElement>('#exp');
+    select.value = '07';
+    change(select);
+    expect(events).toMatchObject([{ kind: 'manualInput' }]);
+    expect(JSON.stringify(events)).not.toContain('07');
+  });
+
+  it('Entrée hors formulaire devient une étape « press », mais pas si elle soumet', async () => {
+    document.body.insertAdjacentHTML('beforeend', '<label for="spa">Recherche</label><input id="spa" type="search" />');
+    const spa = $<HTMLInputElement>('#spa');
+    type(spa, 'react');
+    spa.dispatchEvent(trusted(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(events.map((e) => e.kind)).toEqual(['input', 'press']);
+
+    events.length = 0;
+    const q = $<HTMLInputElement>('#q');
+    q.dispatchEvent(trusted(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    $('#search').dispatchEvent(trusted(new SubmitEvent('submit', { bubbles: true, submitter: null })));
+    await new Promise((resolve) => setTimeout(resolve, 5));
     expect(events.map((e) => e.kind)).toEqual(['submit']);
+  });
+
+  it('capture un clic sur un élément sans rôle mais affiché comme cliquable', () => {
+    document.body.insertAdjacentHTML('beforeend', '<div id="carte" style="cursor: pointer"><span>Ouvrir la carte</span></div>');
+    click($('#carte span'));
+    expect(events).toMatchObject([{ kind: 'click', target: { tag: 'div' } }]);
+  });
+
+  it('signale le départ de la page', () => {
+    window.dispatchEvent(trusted(new Event('beforeunload')));
+    expect(events).toMatchObject([{ kind: 'leave' }]);
   });
 
   it('n’écoute plus rien après l’arrêt', () => {
@@ -142,8 +186,19 @@ describe('classement', () => {
     ['<button>Envoyer la candidature</button>', true],
     ['<button>Supprimer l’alerte</button>', true],
     ['<button>Payer 30 €</button>', true],
+    ['<button>Je confirme</button>', true],
+    ['<button>Payez maintenant</button>', true],
+    ['<button>Commandez</button>', true],
+    ['<button>Submit application</button>', true],
+    ['<button>Soumettre ma candidature</button>', true],
+    ['<button>Déposer ma candidature</button>', true],
+    ['<button>Valider</button>', true],
+    ['<button>Placer la commande</button>', true],
     ['<button>Rechercher</button>', false],
+    ['<button>Se connecter</button>', false],
+    ['<button>Sauvegarder</button>', false],
     ['<a href="/x">Voir l’offre</a>', false],
+    ['<a href="/spa.html">Espace candidat</a>', false],
   ])('%s irréversible : %s', (html, expected) => {
     document.body.innerHTML = html;
     expect(isIrreversibleAction(document.body.firstElementChild as Element)).toBe(expected);

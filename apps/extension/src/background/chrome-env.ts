@@ -8,9 +8,9 @@ import {
   originPatternFor,
   parsePerformResponse,
   parseRecordAck,
+  urlMatches,
   type ContentPong,
   type ContentRequest,
-  type ElementStep,
   type Result,
   type SessionStatus,
 } from '@flowpilot/shared';
@@ -31,17 +31,10 @@ const INDICATOR: Record<SessionStatus, { text: string; color: string }> = {
   replaying: { text: '▶', color: '#1565c0' },
 };
 
-/** URL comparée sous sa forme normalisée. */
-const sameUrl = (a: string | undefined, b: string): boolean => {
-  if (a === undefined) return false;
-  try {
-    return new URL(a).href === new URL(b).href;
-  } catch {
-    return a === b;
-  }
-};
-
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Lecture fraîche du signal (il peut changer pendant un `await`, ce que le flux de types ignore). */
+const isAborted = (signal: AbortSignal): boolean => signal.aborted;
 
 /** Implémentation Chrome de `BrowserEnv`. Toute l'API `chrome.*` du service worker est ici. */
 export const chromeEnv: BrowserEnv = {
@@ -117,17 +110,28 @@ export const chromeEnv: BrowserEnv = {
 
   waitForNavigation: (tabId, url, signal) => waitForUrl(tabId, url, signal),
 
-  async perform(tabId, step, signal) {
+  async perform(tabId, step, signal, confirmed) {
     if (signal.aborted) return fail('NAVIGATION_FAILED', ABORTED_MESSAGE);
     const connected = await chromeEnv.connectContent(tabId);
     if (!connected.ok) return connected;
-    const request: ContentRequest = { type: 'content/perform', step, timeoutMs: ELEMENT_TIMEOUT_MS };
+    // Arrêt survenu pendant la connexion : on n'envoie rien à la page.
+    if (isAborted(signal)) return fail('NAVIGATION_FAILED', ABORTED_MESSAGE);
+    const request: ContentRequest = { type: 'content/perform', step, timeoutMs: ELEMENT_TIMEOUT_MS, confirmed };
+    // Arrêt : la page abandonne aussi l'attente de l'élément (sinon elle agirait quand il apparaît).
+    const cancel = () => {
+      const message: ContentRequest = { type: 'content/cancel' };
+      chrome.tabs.sendMessage(tabId, message).catch(() => undefined);
+    };
+    signal.addEventListener('abort', cancel, { once: true });
+    // La page répond avant un clic ou une soumission : un port fermé signifie qu'elle a
+    // disparu avant d'agir, c'est donc un échec.
     const response = chrome.tabs.sendMessage(tabId, request).then(
-      (raw: unknown) =>
-        parsePerformResponse(raw) ?? fail('CONTENT_UNREACHABLE', 'Réponse inattendue du content script.'),
-      (error: unknown) => unreachableAfterAction(step, error),
+      (raw: unknown) => parsePerformResponse(raw) ?? fail('CONTENT_UNREACHABLE', 'Réponse inattendue du content script.'),
+      (error: unknown) => fail('CONTENT_UNREACHABLE', `La page ne répond plus : ${errorMessage(error)}`),
     );
-    return raceAbort(response, signal);
+    const result = await raceAbort(response, signal);
+    signal.removeEventListener('abort', cancel);
+    return result;
   },
 
   async setIndicator(status) {
@@ -148,20 +152,8 @@ async function ping(tabId: number): Promise<Result<ContentPong>> {
   }
 }
 
-/**
- * Un clic ou une soumission peut décharger la page avant que le content script
- * ne réponde : l'action a eu lieu, l'étape suivante (attente de navigation)
- * vérifiera son effet. Pour les autres étapes, c'est un échec.
- */
-function unreachableAfterAction(step: ElementStep, error: unknown): Result<{ strategy: string }> {
-  const message = errorMessage(error);
-  if ((step.kind === 'click' || step.kind === 'submit') && /message port closed|back\/forward cache/i.test(message)) {
-    return ok({ strategy: 'unconfirmed' });
-  }
-  return fail('CONTENT_UNREACHABLE', `La page ne répond plus : ${message}`);
-}
-
 function raceAbort<T>(promise: Promise<Result<T>>, signal: AbortSignal): Promise<Result<T>> {
+  if (signal.aborted) return Promise.resolve(fail('NAVIGATION_FAILED', ABORTED_MESSAGE));
   return new Promise((resolve) => {
     const onAbort = () => resolve(fail('NAVIGATION_FAILED', ABORTED_MESSAGE));
     signal.addEventListener('abort', onAbort, { once: true });
@@ -190,7 +182,8 @@ async function waitForUrl(tabId: number, url: string, signal: AbortSignal): Prom
       return fail('NAVIGATION_FAILED', 'L’onglet a été fermé pendant l’exécution.');
     }
     lastUrl = tab.url;
-    if (sameUrl(tab.url, url) && tab.status === 'complete') break;
+    // Même origine et même chemin ; paramètres volatils (suivi, horodatage) et secrets ignorés.
+    if (urlMatches(tab.url, url) && tab.status === 'complete') break;
     if (Date.now() >= deadline) {
       return fail(
         'NAVIGATION_FAILED',

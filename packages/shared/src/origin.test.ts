@@ -7,6 +7,8 @@ import {
   originPatternFor,
   patternFromUserInput,
   patternLabel,
+  sanitizeUrl,
+  urlMatches,
 } from './origin.js';
 
 describe('originPatternFor', () => {
@@ -67,5 +69,39 @@ describe('libellés', () => {
   it('retire le schéma ou le joker', () => {
     expect(hostLabel('http://localhost:5173')).toBe('localhost:5173');
     expect(patternLabel('http://localhost/*')).toBe('http://localhost');
+  });
+});
+
+describe('sanitizeUrl', () => {
+  it.each([
+    ['http://x.fr/reset?token=abc&lang=fr', 'http://x.fr/reset?lang=fr'],
+    ['http://x.fr/cb?code=123&state=xyz', 'http://x.fr/cb'],
+    ['http://x.fr/app#access_token=secret&expires=1', 'http://x.fr/app'],
+    ['http://x.fr/app#/profil', 'http://x.fr/app#/profil'],
+    ['http://x.fr/results.html?q=data&ville=Lyon', 'http://x.fr/results.html?q=data&ville=Lyon'],
+    ['http://x.fr/villes?state=CA', 'http://x.fr/villes?state=CA'],
+    ['http://x.fr/dept?code=75', 'http://x.fr/dept?code=75'],
+  ])('%s → %s', (input, expected) => {
+    expect(sanitizeUrl(input)).toBe(expected);
+  });
+});
+
+describe('urlMatches', () => {
+  const expected = 'http://x.fr/results.html?q=data&ville=Lyon';
+  it.each([
+    ['même URL', expected, true],
+    ['paramètre volatil en plus', `${expected}&utm_source=mail&ts=123`, true],
+    ['paramètres dans un autre ordre', 'http://x.fr/results.html?ville=Lyon&q=data', true],
+    ['valeur différente', 'http://x.fr/results.html?q=qa&ville=Lyon', false],
+    ['autre chemin', 'http://x.fr/offer.html?q=data&ville=Lyon', false],
+    ['autre origine', 'http://y.fr/results.html?q=data&ville=Lyon', false],
+    ['URL inconnue', undefined, false],
+  ])('%s', (_label, actual, result) => {
+    expect(urlMatches(actual, expected)).toBe(result);
+  });
+
+  it('tient compte du fragment seulement pour le routage par ancre', () => {
+    expect(urlMatches('http://x.fr/app#/a', 'http://x.fr/app#/b')).toBe(false);
+    expect(urlMatches('http://x.fr/page#haut', 'http://x.fr/page#bas')).toBe(true);
   });
 });

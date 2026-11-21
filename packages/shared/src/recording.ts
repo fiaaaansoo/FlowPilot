@@ -25,6 +25,18 @@ import {
 /** Interaction capturée dans la page : une étape sans id, horodatée (epoch ms). */
 export type RecordedEvent = DistributiveOmit<ElementStep, 'id'> & { at: number };
 
+/**
+ * La page commence à se décharger (`beforeunload`) : une navigation de document
+ * est en cours. Relie une navigation lente (POST long) à l'interaction qui l'a causée.
+ */
+export interface LeaveEvent {
+  kind: 'leave';
+  at: number;
+}
+
+/** Ce que le content script envoie : une interaction ou un départ de page. */
+export type PageEvent = RecordedEvent | LeaveEvent;
+
 /** Changement d'URL de l'onglet enregistré, observé par le service worker. */
 export interface NavigationEvent {
   kind: 'navigation';
@@ -32,7 +44,7 @@ export interface NavigationEvent {
   url: string;
 }
 
-export type DraftEvent = RecordedEvent | NavigationEvent;
+export type DraftEvent = RecordedEvent | LeaveEvent | NavigationEvent;
 
 export interface RecordingDraft {
   workflowId: string;
@@ -49,10 +61,10 @@ export const MAX_DRAFT_EVENTS = 1_000;
 
 /** Une navigation survenant dans ce délai après une interaction en est la conséquence. */
 export const NAVIGATION_CAUSE_WINDOW_MS = 3_000;
+/** Délai max entre le départ de page et l'arrivée de la nouvelle page (formulaire lent). */
+export const SLOW_LOAD_WINDOW_MS = 60_000;
 /** Navigations successives plus rapprochées : chaîne de redirections, une seule étape. */
 export const REDIRECT_WINDOW_MS = 1_500;
-/** Deux clics identiques plus rapprochés : double-clic, un seul clic rejoué. */
-export const DOUBLE_CLICK_WINDOW_MS = 400;
 
 // --- Validation -------------------------------------------------------------
 
@@ -71,6 +83,7 @@ export function parseRecordedEvent(raw: unknown): Result<RecordedEvent> {
 }
 
 function parseDraftEvent(raw: unknown): DraftEvent | null {
+  if (isRecord(raw) && raw.kind === 'leave') return isFiniteNumber(raw.at) ? { kind: 'leave', at: raw.at } : null;
   if (isRecord(raw) && raw.kind === 'navigation') {
     return isFiniteNumber(raw.at) && isNonEmptyString(raw.url) && isSupportedUrl(raw.url)
       ? { kind: 'navigation', at: raw.at, url: raw.url }
@@ -117,11 +130,12 @@ const normalizeUrl = (url: string): string => {
  * - La première étape ouvre toujours la page de départ.
  * - Saisies successives dans le même champ, sélections et cases successives
  *   sur la même cible : seule la dernière valeur est gardée.
- * - Double-clic sur la même cible : un seul clic.
+ * - Clics : tous gardés, même rapprochés (deux clics sur « + » en sont deux).
  * - Navigation : ignorée si l'URL ne change pas (rechargement) ; fusionnée
  *   avec la précédente si elles se suivent de près (redirections) ;
- *   `waitForNavigation` si elle suit une interaction (lien, formulaire, routeur
- *   SPA), `navigate` sinon (URL saisie, historique).
+ *   `waitForNavigation` si elle est causée par une interaction (dans les 3 s,
+ *   ou plus tard si la page a signalé son départ juste après l'interaction :
+ *   formulaire lent), `navigate` sinon (URL saisie, historique).
  */
 export function compileSteps(draft: Pick<RecordingDraft, 'startUrl' | 'startedAt' | 'events'>): WorkflowStep[] {
   const events = [...draft.events].sort((a, b) => a.at - b.at);
@@ -129,7 +143,8 @@ export function compileSteps(draft: Pick<RecordingDraft, 'startUrl' | 'startedAt
   let currentUrl = normalizeUrl(draft.startUrl);
   let lastInteractionAt = Number.NEGATIVE_INFINITY;
   let lastNavigationAt = Number.NEGATIVE_INFINITY;
-  let lastClickAt = Number.NEGATIVE_INFINITY;
+  /** Départ de page signalé peu après une interaction : la prochaine navigation (proche) en est la suite. */
+  let pendingLeaveAt: number | null = null;
 
   const push = (step: DistributiveOmit<WorkflowStep, 'id'>) => {
     if (steps.length < LIMITS.steps) steps.push({ ...step, id: `s${steps.length + 1}` });
@@ -142,6 +157,11 @@ export function compileSteps(draft: Pick<RecordingDraft, 'startUrl' | 'startedAt
   for (const event of events) {
     const last = steps[steps.length - 1];
 
+    if (event.kind === 'leave') {
+      pendingLeaveAt = event.at - lastInteractionAt <= NAVIGATION_CAUSE_WINDOW_MS ? event.at : null;
+      continue;
+    }
+
     if (event.kind === 'navigation') {
       const url = normalizeUrl(event.url);
       if (url === currentUrl) continue;
@@ -149,7 +169,9 @@ export function compileSteps(draft: Pick<RecordingDraft, 'startUrl' | 'startedAt
         (last?.kind === 'navigate' || last?.kind === 'waitForNavigation') &&
         steps.length > 1 &&
         event.at - lastNavigationAt < REDIRECT_WINDOW_MS;
-      const caused = event.at - lastInteractionAt <= NAVIGATION_CAUSE_WINDOW_MS;
+      const slowLoad = pendingLeaveAt !== null && event.at - pendingLeaveAt <= SLOW_LOAD_WINDOW_MS;
+      const caused = slowLoad || event.at - lastInteractionAt <= NAVIGATION_CAUSE_WINDOW_MS;
+      pendingLeaveAt = null;
       const kind = isRedirect ? last.kind : caused ? 'waitForNavigation' : 'navigate';
       if (isRedirect) replaceLast({ kind, url: event.url });
       else push({ kind, url: event.url });
@@ -160,6 +182,8 @@ export function compileSteps(draft: Pick<RecordingDraft, 'startUrl' | 'startedAt
 
     const { at, ...step } = event;
     lastInteractionAt = at;
+    // Une nouvelle interaction annule un départ de page resté sans suite (téléchargement, départ annulé).
+    pendingLeaveAt = null;
     const mergeable =
       last !== undefined &&
       'target' in last &&
@@ -167,19 +191,8 @@ export function compileSteps(draft: Pick<RecordingDraft, 'startUrl' | 'startedAt
       sameTarget(last, event) &&
       (step.kind === 'input' || step.kind === 'manualInput' || step.kind === 'select' || step.kind === 'check');
 
-    if (mergeable) {
-      replaceLast(step);
-    } else if (
-      step.kind === 'click' &&
-      last?.kind === 'click' &&
-      sameTarget(last, event) &&
-      at - lastClickAt < DOUBLE_CLICK_WINDOW_MS
-    ) {
-      // Double-clic : on garde le premier clic.
-    } else {
-      push(step);
-    }
-    if (step.kind === 'click') lastClickAt = at;
+    if (mergeable) replaceLast(step);
+    else push(step);
   }
   return steps;
 }

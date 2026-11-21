@@ -22,6 +22,8 @@ export const ERROR_CODES = [
   'TARGET_NOT_INTERACTABLE',
   /** L'action a été exécutée mais son effet attendu n'est pas constaté. */
   'VERIFICATION_FAILED',
+  /** La page juge l'élément résolu irréversible alors que l'étape n'a pas été confirmée. */
+  'CONFIRMATION_REQUIRED',
   'UNKNOWN_COMMAND',
   'INTERNAL',
 ] as const;

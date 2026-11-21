@@ -18,6 +18,7 @@ import {
   PROTOCOL_VERSION,
   fail,
   isContentRequest,
+  ok,
   isElementStep,
   parseWorkflowStep,
   type ContentEventMessage,
@@ -25,12 +26,12 @@ import {
   type ContentPong,
   type PerformResponse,
   type RecordAck,
-  type RecordedEvent,
+  type PageEvent,
 } from '@flowpilot/shared';
 import { performStep } from '../executor/perform';
 import { InteractionCapture } from '../recorder/capture';
 
-const capture = new InteractionCapture(document, (event: RecordedEvent) => {
+const capture = new InteractionCapture(document, (event: PageEvent) => {
   const message: ContentEventMessage = { type: 'recorder/event', event };
   chrome.runtime.sendMessage(message).catch(() => {
     // Extension rechargée ou service worker indisponible : ce script est orphelin.
@@ -39,6 +40,9 @@ const capture = new InteractionCapture(document, (event: RecordedEvent) => {
 });
 
 type Reply = ContentPong | RecordAck | PerformResponse;
+
+/** Action de replay en cours (attente d'un élément), annulable par `content/cancel`. */
+let currentAction: AbortController | null = null;
 
 // Injecté au chargement d'une page pendant un enregistrement : le service worker
 // indique si cet onglet est celui qu'on enregistre (les autres onglets du site restent inertes).
@@ -71,10 +75,28 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse: (r
         sendResponse(fail('INVALID_WORKFLOW', 'Étape invalide reçue par la page.'));
         return false;
       }
-      void performStep(step.value, message.timeoutMs).then(sendResponse, (error: unknown) => {
-        sendResponse(fail('INTERNAL', error instanceof Error ? error.message : String(error)));
+      currentAction?.abort();
+      const action = new AbortController();
+      currentAction = action;
+      let replied = false;
+      const reply = (response: PerformResponse) => {
+        if (replied) return;
+        replied = true;
+        sendResponse(response);
+      };
+      performStep(step.value, {
+        timeoutMs: message.timeoutMs,
+        confirmed: message.confirmed,
+        signal: action.signal,
+        // Un clic ou une soumission peut décharger la page : on répond avant d'agir.
+        beforeLeavingAction: (strategy) => reply(ok({ strategy })),
+      }).then(reply, (error: unknown) => {
+        reply(fail('INTERNAL', error instanceof Error ? error.message : String(error)));
       });
       return true;
     }
+    case 'content/cancel':
+      currentAction?.abort();
+      return false;
   }
 });

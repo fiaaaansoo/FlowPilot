@@ -111,6 +111,69 @@ describe('resolveTarget', () => {
   });
 });
 
+describe('boutons identiques d’une liste (aucun arbitrage par la position)', () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <ul id="alerts">
+        <li>data, Chaque jour <button type="button">Supprimer l’alerte</button></li>
+        <li>qa, Chaque semaine <button type="button">Supprimer l’alerte</button></li>
+      </ul>`;
+  });
+
+  const second = () => describeElement($('#alerts li:nth-of-type(2) button'));
+
+  it('enregistre la ligne comme contexte et la retrouve après insertion d’une ligne au-dessus', () => {
+    const target = second();
+    expect(target.context).toBe('qa, Chaque semaine Supprimer l’alerte');
+    $('#alerts').insertAdjacentHTML('afterbegin', '<li>react, Chaque jour <button type="button">Supprimer l’alerte</button></li>');
+    const result = resolveTarget(target);
+    expect(result.ok && result.value.strategy).toBe('context');
+    expect(result.ok && result.value.element.parentElement?.textContent).toContain('qa, Chaque semaine');
+  });
+
+  it('sans contexte, refuse même si le sélecteur CSS désigne un seul élément', () => {
+    const { context: _context, ...target } = second();
+    expect(document.querySelectorAll(target.css)).toHaveLength(1);
+    expect(resolveTarget(target)).toMatchObject({ ok: false, error: { code: 'TARGET_AMBIGUOUS' } });
+  });
+
+  it('ne clique pas sur l’élément qui a pris la place d’une ligne supprimée', () => {
+    const target = second();
+    $('#alerts li:nth-of-type(2)').remove();
+    $('#alerts').insertAdjacentHTML('beforeend', '<li>java, Chaque jour <button type="button">Supprimer l’alerte</button></li>');
+    expect(resolveTarget(target)).toMatchObject({ ok: false, error: { code: 'TARGET_NOT_FOUND' } });
+  });
+
+  it('indices forts obsolètes : introuvable plutôt que l’élément à la même position', () => {
+    document.body.innerHTML = '<div><button type="button">Valider</button></div>';
+    const target = describeElement($('button'));
+    $('button').textContent = 'Annuler';
+    expect(document.querySelectorAll(target.css)).toHaveLength(1);
+    expect(resolveTarget(target)).toMatchObject({ ok: false, error: { code: 'TARGET_NOT_FOUND' } });
+  });
+});
+
+describe('liens relatifs', () => {
+  it('retrouve un lien sans nom par son href relatif', () => {
+    document.body.innerHTML = '<nav><a href="offer.html?id=a"><img alt=""></a><a href="offer.html?id=b"><img alt=""></a></nav>';
+    const target = describeElement($('a[href="offer.html?id=b"]'));
+    expect(target.attributes.href).toBe('offer.html?id=b');
+    const result = resolveTarget(target);
+    expect(result.ok && result.value.element.getAttribute('href')).toBe('offer.html?id=b');
+  });
+});
+
+describe('confidentialité des descriptions', () => {
+  it('retire les jetons des liens enregistrés', () => {
+    document.body.innerHTML = '<a href="/reset?token=s3cr3t&lang=fr">Réinitialiser</a><a href="https://x.fr/cb#access_token=abc">OAuth</a>';
+    const [reset, oauth] = Array.from(document.querySelectorAll('a'), (a) => describeElement(a).attributes.href);
+    // Lien porteur de secret : stocké sous sa forme absolue assainie.
+    expect(reset).toMatch(/\/reset\?lang=fr$/);
+    expect(reset).not.toContain('s3cr3t');
+    expect(oauth).toBe('https://x.fr/cb');
+  });
+});
+
 describe('waitForTarget', () => {
   it('attend un élément rendu en différé', async () => {
     setTimeout(() => {

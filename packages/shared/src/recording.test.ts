@@ -27,13 +27,40 @@ describe('compileSteps', () => {
     expect(steps.slice(1)).toMatchObject([{ value: 'data' }, { value: 'Lyon' }]);
   });
 
-  it('réduit un double-clic à un clic, mais garde deux clics espacés', () => {
-    expect(kinds([{ kind: 'click', at: 100, target: t('b') }, { kind: 'click', at: 250, target: t('b') }])).toEqual(['navigate', 'click']);
-    expect(kinds([{ kind: 'click', at: 100, target: t('b') }, { kind: 'click', at: 900, target: t('b') }])).toEqual([
+  it('garde tous les clics, même rapprochés (deux clics sur « + » en sont deux)', () => {
+    expect(kinds([{ kind: 'click', at: 100, target: t('plus') }, { kind: 'click', at: 250, target: t('plus') }])).toEqual([
       'navigate',
       'click',
       'click',
     ]);
+  });
+
+  it('relie une navigation lente à l’interaction grâce au départ de page signalé', () => {
+    const steps = compile([
+      { kind: 'click', at: 1_000, target: t('Envoyer') },
+      { kind: 'leave', at: 1_050 },
+      { kind: 'navigation', at: 9_000, url: 'http://localhost:5173/confirmation' },
+    ]);
+    expect(steps.at(-1)).toMatchObject({ kind: 'waitForNavigation' });
+  });
+
+  it('un départ de page resté sans suite n’influence pas une navigation ultérieure', () => {
+    const steps = compile([
+      { kind: 'click', at: 1_000, target: t('Télécharger') },
+      { kind: 'leave', at: 1_050 },
+      { kind: 'input', at: 5_000, target: t('q'), value: 'x' },
+      { kind: 'navigation', at: 120_000, url: 'http://localhost:5173/saisie' },
+    ]);
+    expect(steps.at(-1)).toMatchObject({ kind: 'navigate' });
+  });
+
+  it('un départ de page sans interaction récente (URL saisie, retour) reste une navigation explicite', () => {
+    const steps = compile([
+      { kind: 'click', at: 1_000, target: t('x') },
+      { kind: 'leave', at: 20_000 },
+      { kind: 'navigation', at: 20_100, url: 'http://localhost:5173/autre' },
+    ]);
+    expect(steps.at(-1)).toMatchObject({ kind: 'navigate' });
   });
 
   it('classe une navigation consécutive à une interaction en attente de navigation', () => {
