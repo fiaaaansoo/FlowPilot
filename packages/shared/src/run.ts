@@ -1,11 +1,27 @@
 import { isFiniteNumber, isRecord } from './guards.js';
 import type { ErrorCode } from './result.js';
+import type { StepKind } from './workflow.js';
 
 /**
- * Résumé de la dernière exécution, conservé pour l'affichage et, plus tard,
- * pour la journalisation / l'évaluation (Sprint 4).
+ * Résultat d'une exécution et journal structuré par étape. Persistés
+ * (historique borné) : base de la future évaluation (Sprint 4) et de la
+ * mémoire des corrections (Sprint 3).
  */
 export type RunOutcome = 'succeeded' | 'aborted' | 'failed';
+export type StepStatus = 'succeeded' | 'failed' | 'aborted';
+
+export interface StepLog {
+  stepIndex: number;
+  kind: StepKind;
+  status: StepStatus;
+  startedAt: number;
+  finishedAt: number;
+  /** Stratégie de grounding qui a résolu la cible (`testid`, `role`, `css`...). */
+  strategy?: string;
+  /** Renseignés en cas d'échec. */
+  code?: ErrorCode;
+  message?: string;
+}
 
 export interface RunSummary {
   workflowId: string;
@@ -16,11 +32,12 @@ export interface RunSummary {
   totalSteps: number;
   /** Renseigné si `outcome === 'failed'` : étape (0-based) en échec et cause. */
   failure?: { stepIndex: number; code: ErrorCode; message: string };
+  log: StepLog[];
 }
 
 /** Run en échec à l'étape `stepIndex` (les étapes précédentes sont réussies). */
 export function failedRun(
-  base: Pick<RunSummary, 'workflowId' | 'startedAt' | 'finishedAt' | 'totalSteps'>,
+  base: Pick<RunSummary, 'workflowId' | 'startedAt' | 'finishedAt' | 'totalSteps' | 'log'>,
   stepIndex: number,
   code: ErrorCode,
   message: string,
@@ -29,6 +46,21 @@ export function failedRun(
 }
 
 const OUTCOMES: ReadonlySet<unknown> = new Set<RunOutcome>(['succeeded', 'aborted', 'failed']);
+const STEP_STATUSES: ReadonlySet<unknown> = new Set<StepStatus>(['succeeded', 'failed', 'aborted']);
+
+function isStepLog(raw: unknown): raw is StepLog {
+  return (
+    isRecord(raw) &&
+    isFiniteNumber(raw.stepIndex) &&
+    typeof raw.kind === 'string' &&
+    STEP_STATUSES.has(raw.status) &&
+    isFiniteNumber(raw.startedAt) &&
+    isFiniteNumber(raw.finishedAt) &&
+    (raw.strategy === undefined || typeof raw.strategy === 'string') &&
+    (raw.code === undefined || typeof raw.code === 'string') &&
+    (raw.message === undefined || typeof raw.message === 'string')
+  );
+}
 
 /** Garde d'exécution pour un `RunSummary` relu depuis le stockage. */
 export function isRunSummary(raw: unknown): raw is RunSummary {
@@ -39,7 +71,9 @@ export function isRunSummary(raw: unknown): raw is RunSummary {
     !isFiniteNumber(raw.startedAt) ||
     !isFiniteNumber(raw.finishedAt) ||
     !isFiniteNumber(raw.stepsCompleted) ||
-    !isFiniteNumber(raw.totalSteps)
+    !isFiniteNumber(raw.totalSteps) ||
+    !Array.isArray(raw.log) ||
+    !(raw.log as unknown[]).every(isStepLog)
   ) {
     return false;
   }

@@ -15,6 +15,7 @@ export default defineConfig({
         index: resolve(root, 'index.html'),
         results: resolve(root, 'results.html'),
         offer: resolve(root, 'offer.html'),
+        spa: resolve(root, 'spa.html'),
       },
     },
   },

@@ -49,6 +49,17 @@ function renderJob(job: Job): HTMLLIElement {
   const text = document.createElement('p');
   text.textContent = job.summary;
 
-  item.append(title, meta, text);
+  // Boutons au libellé identique d'une offre à l'autre : distingués par leur nom accessible.
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'link';
+  save.textContent = 'Sauvegarder';
+  save.setAttribute('aria-label', `Sauvegarder ${job.title}`);
+  save.addEventListener('click', () => {
+    save.textContent = 'Sauvegardée';
+    save.disabled = true;
+  });
+
+  item.append(title, meta, text, save);
   return item;
 }

@@ -5,13 +5,15 @@ interface Props {
   session: SessionState;
   /** Workflow en cours de lecture, si connu. */
   replayed: Workflow | undefined;
+  /** Nombre d'étapes déjà capturées pendant un enregistrement. */
+  recordedSteps?: number | undefined;
 }
 
 /**
  * Voyant d'état façon annonciateur de cockpit : éteint au repos, orange
  * (enregistreur de vol) pendant l'enregistrement, vert-bleu pendant la lecture.
  */
-export function Annunciator({ session, replayed }: Props) {
+export function Annunciator({ session, replayed, recordedSteps }: Props) {
   const elapsed = useElapsed(session.status === 'recording' ? session.startedAt : null);
 
   let title: string;
@@ -23,11 +25,11 @@ export function Annunciator({ session, replayed }: Props) {
       break;
     case 'recording':
       title = 'Enregistrement';
-      detail = `${hostLabel(session.origin)}, depuis ${elapsed}`;
+      detail = `${hostLabel(session.origin)}, depuis ${elapsed}${recordedSteps ? `, ${recordedSteps} étape${recordedSteps > 1 ? 's' : ''}` : ''}`;
       break;
     case 'replaying': {
       const total = replayed?.steps.length ?? 0;
-      title = 'Lecture';
+      title = session.awaitingHuman ? 'Lecture en pause' : 'Lecture';
       detail = `Étape ${Math.min(session.stepIndex + 1, Math.max(total, 1))} sur ${total}${replayed ? `, ${replayed.name}` : ''}`;
       break;
     }
