@@ -13,6 +13,8 @@ import { isIrreversibleAction, submissionScope } from '../recorder/classify';
  */
 export interface PerformOptions {
   timeoutMs: number;
+  /** Report a missing target early once the page is settled (0 = wait the full timeout). */
+  settleMs?: number;
   /** Un humain a validé l'étape (confirmation au replay). */
   confirmed: boolean;
   signal?: AbortSignal;
@@ -25,8 +27,8 @@ export interface PerformOptions {
 }
 
 export async function performStep(step: ElementStep, options: PerformOptions): Promise<PerformResponse> {
-  const { timeoutMs, signal, doc = document } = options;
-  const resolved = await waitForTarget(step.target, timeoutMs, doc, 100, signal);
+  const { timeoutMs, signal, doc = document, settleMs = 0 } = options;
+  const resolved = await waitForTarget(step.target, timeoutMs, doc, 100, signal, settleMs);
   if (!resolved.ok) return resolved;
   if (signal?.aborted) return fail('NAVIGATION_FAILED', 'Exécution arrêtée.');
   return actOn(resolved.value.element, step, resolved.value.strategy, options);

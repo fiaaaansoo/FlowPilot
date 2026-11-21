@@ -88,6 +88,7 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse: (r
       };
       performStep(step.value, {
         timeoutMs: message.timeoutMs,
+        ...(message.settleMs !== undefined ? { settleMs: message.settleMs } : {}),
         confirmed: message.confirmed,
         signal: action.signal,
         // Un clic ou une soumission peut décharger la page : on répond avant d'agir.

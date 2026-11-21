@@ -188,3 +188,50 @@ describe('waitForTarget', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'TARGET_NOT_FOUND' } });
   });
 });
+
+describe('waitForTarget — adaptive settle (Sprint 4)', () => {
+  const missing = { tag: 'button', name: 'Absent', role: 'button', attributes: {}, css: '#absent' };
+  const late = { tag: 'button', role: 'button', name: 'Tardif', attributes: { id: 'tardif' }, css: '#tardif' };
+  const insertLate = () => document.body.insertAdjacentHTML('beforeend', '<button id="tardif">Tardif</button>');
+
+  it('gives up early once the page is settled (no DOM change, no loading indicator)', async () => {
+    const started = Date.now();
+    const result = await waitForTarget(missing, 3_000, document, 10, undefined, 100);
+    expect(result).toMatchObject({ ok: false, error: { code: 'TARGET_NOT_FOUND' } });
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it('keeps waiting while the DOM keeps changing', async () => {
+    const ticker = setInterval(() => document.body.insertAdjacentHTML('beforeend', '<span>…</span>'), 30);
+    setTimeout(() => {
+      clearInterval(ticker);
+      insertLate();
+    }, 400);
+    const result = await waitForTarget(late, 3_000, document, 10, undefined, 100);
+    clearInterval(ticker);
+    expect(result.ok).toBe(true);
+  });
+
+  it('keeps waiting while a loading indicator is shown', async () => {
+    document.body.insertAdjacentHTML('beforeend', '<div id="spinner" aria-busy="true">Chargement…</div>');
+    setTimeout(() => {
+      document.getElementById('spinner')?.remove();
+      insertLate();
+    }, 400);
+    const result = await waitForTarget(late, 3_000, document, 10, undefined, 100);
+    expect(result.ok).toBe(true);
+  });
+
+  it('documents the trade-off: an element added after a silent pause longer than the settle window is missed', async () => {
+    setTimeout(insertLate, 500);
+    const result = await waitForTarget(late, 3_000, document, 10, undefined, 100);
+    expect(result.ok).toBe(false);
+  });
+
+  it('settle 0 keeps the legacy behaviour (waits up to the timeout)', async () => {
+    setTimeout(insertLate, 300);
+    const result = await waitForTarget(late, 3_000, document, 10, undefined, 0);
+    expect(result.ok).toBe(true);
+  });
+});
+

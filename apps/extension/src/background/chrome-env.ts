@@ -23,6 +23,12 @@ import type { BrowserEnv } from './controller';
 export const NAVIGATION_TIMEOUT_MS = 15_000;
 /** Délai max d'apparition d'un élément (contenu chargé en différé). */
 export const ELEMENT_TIMEOUT_MS = 10_000;
+/**
+ * A missing element is reported once the page has been settled this long (no DOM change, no loading
+ * indicator), instead of always waiting ELEMENT_TIMEOUT_MS. Chosen from the Sprint 4 measurements
+ * (docs/benchmarks/sprint-4.md); build with VITE_FLOWPILOT_SETTLE_MS=0 to restore the fixed wait.
+ */
+export const ELEMENT_SETTLE_MS = Number(import.meta.env.VITE_FLOWPILOT_SETTLE_MS ?? '1500');
 const POLL_MS = 150;
 const CONTENT_SCRIPT_FILE = 'content.js';
 const RECORDER_SCRIPT_ID = 'flowpilot-recorder';
@@ -119,7 +125,7 @@ export const chromeEnv: BrowserEnv = {
     if (!connected.ok) return connected;
     // Arrêt survenu pendant la connexion : on n'envoie rien à la page.
     if (isAborted(signal)) return fail('NAVIGATION_FAILED', ABORTED_MESSAGE);
-    const request: ContentRequest = { type: 'content/perform', step, timeoutMs: ELEMENT_TIMEOUT_MS, confirmed };
+    const request: ContentRequest = { type: 'content/perform', step, timeoutMs: ELEMENT_TIMEOUT_MS, settleMs: ELEMENT_SETTLE_MS, confirmed };
     // Arrêt : la page abandonne aussi l'attente de l'élément (sinon elle agirait quand il apparaît).
     const cancel = () => {
       const message: ContentRequest = { type: 'content/cancel' };

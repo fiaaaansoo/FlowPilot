@@ -13,7 +13,7 @@ import { backendCall, enableAiRecovery, latestRun, seedWorkflow, setVariant } fr
 
 const PORT = 8798;
 const TOKEN = 'lifecycle-token-0123456789abcdef';
-const DELAY_MS = 4_000;
+const DELAY_MS = 8_000;
 
 let backend: ChildProcess | undefined;
 
@@ -55,8 +55,9 @@ async function startAndWaitForPendingRecovery(sidePanel: Page, serviceWorker: Wo
   await demo.bringToFront();
   await sidePanel.getByRole('button', { name: 'Rejouer' }).click();
   await expect(demo).toHaveURL('http://localhost:5173/');
-  // Deterministic resolution gives up after ~10 s, then the recovery request starts and takes DELAY_MS.
-  await sidePanel.waitForTimeout(11_000);
+  // The missing element is reported once the page is settled (~1.5 s); the recovery request then
+  // takes DELAY_MS, so it is in flight from ~2 s to ~10 s.
+  await sidePanel.waitForTimeout(4_000);
 }
 
 async function expectPageUntouched(demo: Page): Promise<void> {
@@ -77,7 +78,7 @@ test.describe('AI recovery and the service worker lifecycle', () => {
     const before = await metrics();
     const demo = await context.newPage();
     await startAndWaitForPendingRecovery(sidePanel, serviceWorker, demo, 'Rechercher');
-    await sidePanel.getByRole('button', { name: 'Arrêter' }).click();
+    await sidePanel.locator('.control--stop').click();
     await expect(sidePanel.getByLabel('État de FlowPilot')).toHaveAttribute('data-status', 'idle');
     await expectPageUntouched(demo);
     expect((await latestRun(serviceWorker))?.outcome).toBe('aborted');

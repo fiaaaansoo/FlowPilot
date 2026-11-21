@@ -40,7 +40,7 @@ export type ContentRequest =
    * Localise la cible de l'étape (en attendant au plus `timeoutMs`) puis exécute l'action.
    * `confirmed` : un humain a validé l'étape ; sinon la page refuse une action qu'elle juge irréversible.
    */
-  | { type: 'content/perform'; step: ElementStep; timeoutMs: number; confirmed: boolean }
+  | { type: 'content/perform'; step: ElementStep; timeoutMs: number; confirmed: boolean; settleMs?: number }
   /** Annule l'action en cours (arrêt du replay pendant l'attente d'un élément). */
   | { type: 'content/cancel' }
   /** AI recovery: bounded, sanitized snapshot of the visible interactive elements. */
@@ -104,7 +104,12 @@ export function isContentRequest(value: unknown): value is ContentRequest {
     case 'content/record':
       return typeof value.recording === 'boolean';
     case 'content/perform':
-      return isRecord(value.step) && isFiniteNumber(value.timeoutMs) && typeof value.confirmed === 'boolean';
+      return (
+        isRecord(value.step) &&
+        isFiniteNumber(value.timeoutMs) &&
+        typeof value.confirmed === 'boolean' &&
+        (value.settleMs === undefined || isFiniteNumber(value.settleMs))
+      );
     case 'content/cancel':
     case 'content/observe':
       return true;
