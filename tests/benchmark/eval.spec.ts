@@ -2,7 +2,7 @@ import type { ChildProcess } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { Page, Worker } from '@playwright/test';
-import { classify, proposalMatches, proposedPart, type AttemptRecord, type Gesture, type Manifest, type Observed, type PageCheck, type Scenario } from '@flowpilot/evaluation';
+import { classify, proposedPart, simulatedUserAccepts, type AttemptRecord, type Gesture, type Manifest, type Observed, type PageCheck, type Scenario } from '@flowpilot/evaluation';
 import { startBackend } from '../e2e/backend';
 import { expect, test } from '../e2e/fixtures';
 import { enableAiRecovery, latestRun, startRecording, stopRecording, waitForCapture } from '../e2e/helpers';
@@ -125,6 +125,7 @@ interface RecoveryInfo {
   costUsd: number;
   serviceLatencyMs?: number;
   proposed?: string;
+  reason?: string;
 }
 interface RunInfo {
   outcome: 'succeeded' | 'failed' | 'aborted';
@@ -134,11 +135,7 @@ interface RunInfo {
   log: { status: string; strategy?: string; recovery?: RecoveryInfo }[];
 }
 
-interface Oracle {
-  target: string | null;
-  context?: string;
-  accept: boolean;
-}
+type Oracle = Parameters<typeof simulatedUserAccepts>[1];
 
 /**
  * Replays a workflow; confirmation prompts are answered by the simulated user, who accepts only
@@ -162,9 +159,9 @@ async function replay(sidePanel: Page, serviceWorker: Worker, demo: Page, workfl
       if (run && run.startedAt !== previous) return { run, prompts, accepted, visited, timedOut: false };
       const dialog = sidePanel.getByRole('alertdialog');
       if (await dialog.isVisible()) {
-        const proposal = proposedPart((await dialog.textContent()) ?? '').trim();
-        prompts.push(proposal);
-        const ok = oracle.accept && oracle.target !== null && proposalMatches(proposal, oracle.target, oracle.context);
+        const text = (await dialog.textContent()) ?? '';
+        prompts.push(proposedPart(text).trim());
+        const ok = simulatedUserAccepts(text, oracle);
         accepted ||= ok;
         await dialog.getByRole('button', { name: ok ? 'Confirmer et exécuter' : 'Arrêter' }).click();
       }
@@ -319,6 +316,7 @@ for (const [index, config] of CONFIGS.entries()) {
             // Proposals shown to the user, then those executed without asking (from the run log).
             proposals: [...new Set([...result.prompts, ...recoveries.flatMap((r) => (r.proposed ? [r.proposed] : []))])],
             strategies,
+            reasons: recoveries.flatMap((r) => (r.reason ? [r.reason] : [])),
             modelCalls: sum((r) => r.modelCalls),
             inputTokens: sum((r) => r.inputTokens),
             outputTokens: sum((r) => r.outputTokens),

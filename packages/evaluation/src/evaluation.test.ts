@@ -7,6 +7,7 @@ import {
   parseResults,
   proposalMatches,
   proposedPart,
+  simulatedUserAccepts,
   quantile,
   stdev,
   summarize,
@@ -126,6 +127,20 @@ describe('simulated user', () => {
     expect(proposalMatches(proposedPart(tricky), 'Rechercher')).toBe(false);
     // A plain confirmation of a recorded irreversible step names that step's element.
     expect(proposalMatches(proposedPart('Cliquer sur « Postuler » : cette action peut être irréversible.'), 'Postuler')).toBe(true);
+  });
+});
+
+describe('simulated user answers', () => {
+  const user = { target: 'Candidater', accept: true };
+  it('confirms the recorded step itself when completing is right', () => {
+    expect(simulatedUserAccepts('Confirmation requiseCliquer sur « Postuler » : cette action peut être irréversible.', user)).toBe(true);
+    expect(simulatedUserAccepts('Confirmation requiseCliquer sur « Rechercher » : cette action peut être irréversible.', { target: null, accept: true })).toBe(false);
+  });
+  it('judges an AI proposal on the proposed element only, and never accepts when told to decline', () => {
+    const proposal = 'Cliquer sur « Postuler » : … FlowPilot propose « Candidater » (button) (modèle de langage, confiance 90 %)';
+    expect(simulatedUserAccepts(proposal, user)).toBe(true);
+    expect(simulatedUserAccepts(proposal, { target: 'Postuler', accept: true })).toBe(false);
+    expect(simulatedUserAccepts(proposal, { ...user, accept: false })).toBe(false);
   });
 });
 

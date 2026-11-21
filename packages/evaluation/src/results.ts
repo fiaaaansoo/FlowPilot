@@ -78,6 +78,8 @@ export interface AttemptRecord {
   verdict: Verdict;
   /** Labels of the elements proposed by recovery (shown or executed), in order. */
   proposals: string[];
+  /** Why recovery escalated or stopped, as logged by FlowPilot (empty when it did not). */
+  reasons?: string[];
   strategies: string[];
   modelCalls: number;
   inputTokens: number;
@@ -184,6 +186,28 @@ export function proposedPart(promptText: string): string {
     .map((marker) => rest.indexOf(marker))
     .filter((i) => i >= 0);
   return ends.length ? rest.slice(0, Math.min(...ends)) : rest;
+}
+
+export interface SimulatedUser {
+  /** Ground-truth element, or null when no element is correct. */
+  target: string | null;
+  context?: string;
+  /** False for a prior run where the user declines whatever is proposed. */
+  accept: boolean;
+}
+
+/**
+ * The careful user's answer to a confirmation prompt.
+ * - An AI proposal is accepted only if the proposed element is the ground-truth one.
+ * - A plain confirmation of the user's own recorded step (irreversible step, cross-origin
+ *   submission of the recorded form) is accepted only when completing the procedure is right
+ *   (target not null): the user confirms their own action, not a substitute.
+ */
+export function simulatedUserAccepts(promptText: string, user: SimulatedUser): boolean {
+  if (!user.accept || user.target === null) return false;
+  const isProposal = promptText.includes('FlowPilot propose');
+  if (!isProposal) return true;
+  return proposalMatches(proposedPart(promptText), user.target, user.context);
 }
 
 /** Does a proposal (as shown to the user) name the ground-truth element (and its row or section, when given)? */

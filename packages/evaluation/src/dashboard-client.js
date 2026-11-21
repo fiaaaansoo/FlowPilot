@@ -179,6 +179,8 @@
       el('p', {}, `Verdict: ${a.verdict}. Expected: ${a.expected.outcome}${a.expected.target ? ` « ${a.expected.target} »` : ''}${a.expected.human === 'required' ? ', human required' : ''}.`),
       el('h4', {}, 'Proposals (as shown or executed)'),
       a.proposals.length ? el('ul', {}, a.proposals.map((p) => el('li', {}, p))) : el('p', {}, 'None.'),
+      el('h4', {}, 'Recovery reasons (escalations, rejections)'),
+      a.reasons && a.reasons.length ? el('ul', {}, a.reasons.map((r) => el('li', {}, r))) : el('p', {}, 'None logged.'),
       el('h4', {}, 'Observed by the runner'),
       pre(a.observed),
     );
