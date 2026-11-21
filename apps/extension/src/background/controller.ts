@@ -11,7 +11,7 @@ import {
   type Command,
   type CommandResponse,
   RECOVERY_CONTRACT,
-  type AiProposalPrompt,
+  type HumanPromptInfo,
   type AiSettings,
   type ContentPong,
   type FlowPilotError,
@@ -326,7 +326,7 @@ export class SessionController {
         navigate: (url, signal) => env.navigate(tabId, url, signal),
         waitForNavigation: (url, signal) => env.waitForNavigation(tabId, url, signal),
         perform: (step, signal, confirmed) => env.perform(tabId, step, signal, confirmed),
-        requestHuman: (stepIndex, signal) => this.requestHuman(run, stepIndex, signal),
+        requestHuman: (stepIndex, signal, prompt) => this.requestHuman(run, stepIndex, signal, prompt),
         recover: (stepIndex, step, failure, signal) => this.aiRecover(run, { runId, workflow, budget }, stepIndex, step, failure, signal),
         reportOutcome: (recoveryId, verified, detail) => {
           void run.backend?.reportOutcome(recoveryId, { contract: RECOVERY_CONTRACT, verified, detail });
@@ -388,7 +388,7 @@ export class SessionController {
   }
 
   /** Suspend le run jusqu'à `replay/continue` (ou l'arrêt) ; la session signale l'attente au Side Panel. */
-  private requestHuman(run: ActiveRun, stepIndex: number, signal: AbortSignal, prompt?: AiProposalPrompt): Promise<boolean> {
+  private requestHuman(run: ActiveRun, stepIndex: number, signal: AbortSignal, prompt?: HumanPromptInfo): Promise<boolean> {
     return new Promise((resolve) => {
       if (signal.aborted) {
         resolve(false);

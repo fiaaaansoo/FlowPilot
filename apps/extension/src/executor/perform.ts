@@ -1,5 +1,5 @@
 import { fail, ok, type ElementStep, type PerformResponse } from '@flowpilot/shared';
-import { isDisabled, submitsCrossOrigin } from '../grounding/dom';
+import { foreignDestination, isDisabled, submitsCrossOrigin } from '../grounding/dom';
 import { resolveRef } from '../grounding/observe';
 import { waitForTarget } from '../grounding/resolve';
 import { isIrreversibleAction, submissionScope } from '../recorder/classify';
@@ -65,7 +65,8 @@ function actOn(el: Element, step: ElementStep, strategy: string, options: Perfor
   }
   // Form data sent to another site is treated like an irreversible action, whatever found the element.
   if ((step.kind === 'click' || step.kind === 'submit' || step.kind === 'press') && !confirmed && submitsCrossOrigin(judged)) {
-    return fail('CONFIRMATION_REQUIRED', 'Ce formulaire envoie des données vers un autre site : confirmation humaine requise.');
+    const to = foreignDestination(judged);
+    return fail('CONFIRMATION_REQUIRED', `Ce formulaire envoie des données vers un autre site (${to ?? 'origine inconnue'}) : confirmation humaine requise.`);
   }
   if (el instanceof HTMLElement) el.scrollIntoView({ block: 'center', inline: 'nearest' });
 

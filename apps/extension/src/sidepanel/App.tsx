@@ -101,7 +101,7 @@ export function App({ api, keepAliveMs = 20_000 }: Props) {
       {humanStep && session.status === 'replaying' && (
         <HumanPrompt
           step={humanStep}
-          proposal={session.humanPrompt}
+          prompt={session.humanPrompt}
           busy={busy}
           onContinue={() => void run({ type: 'replay/continue', stepIndex: session.stepIndex })}
           onStop={stop}

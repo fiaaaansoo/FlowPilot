@@ -286,4 +286,23 @@ describe('Side Panel', () => {
     expect(dialog).toHaveTextContent('FlowPilot propose « Trouver des offres » (button) (modèle de langage, confiance 62 %)');
     expect(dialog).toHaveTextContent('Justification du modèle, non vérifiée : synonyme');
   });
+
+  it('explains a page-side confirmation, such as data sent to another site', async () => {
+    const fake = fakeApi({
+      session: {
+        status: 'replaying',
+        tabId: 1,
+        workflowId: 'wf-1',
+        startedAt: 1,
+        stepIndex: 0,
+        awaitingHuman: true,
+        humanPrompt: { kind: 'warning', message: 'Ce formulaire envoie des données vers un autre site (https://evil.example) : confirmation humaine requise.' },
+      },
+      workflows: { workflows: [workflow], invalidCount: 0 },
+    });
+    render(<App api={fake.api} />);
+    const dialog = await screen.findByRole('alertdialog', { name: 'Confirmation requise' });
+    expect(dialog).toHaveTextContent('https://evil.example');
+  });
 });
+

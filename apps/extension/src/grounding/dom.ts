@@ -328,3 +328,15 @@ export function submitsCrossOrigin(el: Element): boolean {
   return isSubmitter(el) && el.form !== null && !sameOrigin(el);
 }
 
+/** Origin the element would send the user or the form data to, when it differs from the page's. */
+export function foreignDestination(el: Element): string | null {
+  const target = destination(el);
+  if (!target) return null;
+  try {
+    const origin = new URL(target, el.ownerDocument.baseURI).origin;
+    return origin === el.ownerDocument.defaultView?.location.origin ? null : origin;
+  } catch {
+    return 'une adresse invalide';
+  }
+}
+

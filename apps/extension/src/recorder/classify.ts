@@ -50,7 +50,7 @@ const IRREVERSIBLE =
  */
 /** Enter in a text field submits its form: that form, judged by its submit button, is what really acts. */
 export function submissionScope(el: Element): Element {
-  return el instanceof HTMLInputElement ? (el.closest('form') ?? el) : el;
+  return el instanceof HTMLInputElement ? (el.form ?? el.closest('form') ?? el) : el;
 }
 
 export function isIrreversibleAction(el: Element): boolean {

