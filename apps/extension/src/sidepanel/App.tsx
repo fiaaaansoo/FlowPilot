@@ -29,6 +29,7 @@ export function App({ api, keepAliveMs = 20_000 }: Props) {
   const { session, workflows, runs, draft, allowedOrigins, ai } = snapshot;
   const [error, setError] = useState<FlowPilotError | null>(null);
   const [busy, setBusy] = useState(false);
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
   const [pickedId, setPickedId] = useState<string | null>(null);
 
   // Sélection : le workflow en lecture, sinon celui choisi s'il existe encore, sinon le plus récent.
@@ -151,6 +152,8 @@ export function App({ api, keepAliveMs = 20_000 }: Props) {
         api={api}
         settings={ai}
         onError={(message) => setError({ code: 'RECOVERY_UNAVAILABLE', message })}
+        notice={aiNotice}
+        onNotice={setAiNotice}
       />
     </main>
   );

@@ -159,7 +159,15 @@ machine), [ADR 0003](adr/0003-verified-memory-sqlite.md) (verified memory in SQL
   same `actOn` code path as deterministic replay. The content script revalidates snapshot, URL and
   element identity just before acting.
 - A recovery counts as verified only when the next step succeeds; only then is the correction memorized.
-- Budgets bound every request and every run (model calls, tokens, time, cost).
+- Budgets bound every request and every run (model calls, tokens, time, cost), checked before each model call.
+- Autonomy is narrow by design. A model proposal acts alone only for a click, when the deterministic ranking
+  independently agrees with it and it shares label words, an identifier or context with the recorded element.
+  Everything else — pure synonyms, value or submission steps, corrections learned in another workflow — is
+  confirmed by the user. The service worker re-applies these rules itself and does not rely on the backend flag.
+- Cancellation is cooperative. A stopped replay aborts the request, discards late answers and never acts after a
+  stop. The backend cancels on client disconnect between agent steps, but an in-flight model call runs to its
+  timeout. A suspended service worker takes pending requests with it, and its run is marked failed on restart.
+- Request bodies are limited while they stream in (ASGI middleware), not from `Content-Length`.
 
 | Sprint 2 insertion point | Sprint 3 implementation |
 | --- | --- |
@@ -191,5 +199,6 @@ machine), [ADR 0003](adr/0003-verified-memory-sqlite.md) (verified memory in SQL
 - AI recovery handles element steps only (not navigations, URL waits or manual input), on the main
   frame, and needs the local service to be running; it does not edit the recorded workflow (corrections
   live in the service's memory).
+- An in-flight model call is not interrupted when a replay is stopped; its answer is discarded.
 - Recovery confidence comes from heuristics and the model: thresholds are conservative, so some
   correct proposals still ask for confirmation.

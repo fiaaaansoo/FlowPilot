@@ -7,6 +7,12 @@ interface Props {
   settings: AiSettings;
   /** Requests host access to the backend (user gesture) and reports the outcome. */
   onError: (message: string) => void;
+  /**
+   * Last save confirmation. Kept by the parent: saving changes the stored settings,
+   * which remounts this form, so a local message would vanish immediately.
+   */
+  notice: string | null;
+  onNotice: (message: string | null) => void;
 }
 
 /**
@@ -16,7 +22,7 @@ interface Props {
  * The parent remounts this form (via `key`) when the stored settings change, so
  * local edits always start from the saved values.
  */
-export function AiRecovery({ api, settings, onError }: Props) {
+export function AiRecovery({ api, settings, onError, notice, onNotice }: Props) {
   const [endpoint, setEndpoint] = useState(settings.endpoint);
   const [token, setToken] = useState(settings.token);
   const [mode, setMode] = useState<AutonomyMode>(settings.mode);
@@ -48,7 +54,7 @@ export function AiRecovery({ api, settings, onError }: Props) {
           return;
         }
         await api.saveAiSettings(draft);
-        setStatus('Réglages enregistrés.');
+        onNotice('Réglages enregistrés.');
       })
       .catch(() => onError('Accès au service local non accordé.'));
   };
@@ -117,9 +123,9 @@ export function AiRecovery({ api, settings, onError }: Props) {
             Tester la connexion
           </button>
         </div>
-        {status && (
+        {(status ?? notice) && (
           <p className="hint" role="status">
-            {status}
+            {status ?? notice}
           </p>
         )}
       </form>

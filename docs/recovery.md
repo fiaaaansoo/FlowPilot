@@ -59,14 +59,17 @@ The response is either `propose_target` (`ref`, `confidence`, `strategy`
 ## What is never sent or executed
 
 - No field values, passwords, payment fields, OTP fields or hidden elements: the
-  observation skips sensitive and invisible elements and never reads `value`.
+  observation skips sensitive and invisible elements (hidden forms included) and never
+  reads `value`. Rich-text editors (`contenteditable`) and ARIA text boxes count as
+  fields: their typed content never becomes a name, a text or a row context.
 - URLs are sanitized before leaving the page (query values dropped).
 - No full-page HTML is sent or stored.
 - The model selects a `ref` among observed candidates. The action and any value
   always come from the recorded step. There is no tool that runs JavaScript,
   navigates, or types free text.
-- Cross-origin links are removed from the model context and rejected by both the
-  backend and the service worker.
+- Cross-origin links, and forms or submit buttons whose `action`/`formaction` leaves
+  the origin, are removed from the model context and rejected by both the backend and
+  the service worker.
 - Recovery never runs for `manualInput` steps, permission errors, sensitive-field
   restrictions, missing confirmations or policy errors (`isRecoverable`).
 
@@ -74,8 +77,11 @@ The response is either `propose_target` (`ref`, `confidence`, `strategy`
 
 Deterministic first, model last:
 
-1. **Memory**: a verified correction for the same origin, workflow, step and
-   recorded target is reused if exactly one observed element matches it.
+1. **Memory**: a verified correction for the same recorded target and origin is
+   reused if exactly one observed element matches it. It acts alone only in the exact
+   workflow step where it was learned, and only for a click. A correction learned in
+   another workflow, or one that would receive a value or submit a form, is only a
+   suggestion: the user confirms it.
 2. **Semantic grounding** (`grounding.py`): weighted label, identifier, context and
    structure similarity with stemming for French and English. Accepted only above
    0.6 with a 0.2 margin over the runner-up.
@@ -90,6 +96,10 @@ A model proposal is executed without asking only if all of these hold:
 - **independent agreement**: the deterministic ranking of all usable observed
   elements against the recorded target puts the same element strictly first
   (page text cannot move an element unlike the recorded one to the top);
+- **evidence beyond structure**: that element shares label words (score ≥ 0.3), a
+  stable identifier, or row context with the recorded one. A lone button of the right
+  type is not evidence. A pure synonym (« Rechercher » → « Trouver des offres ») has
+  none, so it is always confirmed by the user;
 - structural support ≥ 0.6 (same role, tag or type);
 - no identical copy anywhere in the observation (counted over the whole page, not
   only the elements shown to the model);
@@ -103,9 +113,15 @@ the backend).
 
 The service worker then applies its own rules regardless of the backend: the
 response binding must match, the ref must be in the observation, the element must
-accept the step kind and be same-origin. It asks the user when the backend asks,
-when the element is irreversible, when the step itself required confirmation, or
-when the user chose « Toujours me demander ». The content script re-checks the
+accept the step kind and be same-origin. It asks the user when any of these holds,
+whatever the backend says:
+- the backend asks;
+- the element is irreversible;
+- the step itself required confirmation;
+- the user chose « Toujours me demander »;
+- a non-semantic recovery (model or memory) would type a value or submit a form;
+- a model's choice shares no label word or stable identifier with the recorded
+  element (`sharesIdentity`). The content script re-checks the
 snapshot id, the page URL and the element identity right before acting, and still
 refuses an irreversible element without confirmation.
 
@@ -177,17 +193,64 @@ tokens and time per recovered step.
 
 - Unit: `apps/api/tests` (pytest), `apps/extension/src/**/recovery*.test.ts`,
   `observe.test.ts`, controller and side panel tests (Vitest).
-- End to end: `tests/e2e/recovery.spec.ts` on the shipped build with the real
-  backend and the mock provider.
+- End to end: `tests/e2e/recovery.spec.ts` and `tests/e2e/lifecycle.spec.ts` on the
+  shipped build with the real backend and the mock provider.
 - Benchmark: `npm run bench`, see [benchmarks](benchmarks/README.md).
+
+## Cancellation, late answers and the service worker lifecycle
+
+- **Extension.** Stopping a replay aborts the recovery request (`AbortSignal`).
+  - A response that arrives anyway is discarded before any validation, and reported as
+    not verified.
+  - A stop during the confirmation prompt also prevents execution.
+- **Backend.**
+  - The propose route runs the agent in a worker thread and watches for the client's
+    disconnect every 250 ms.
+  - The agent checks the cancel flag between steps and after every model call, and
+    escalates instead of proposing.
+  - An in-flight provider call is **not** interrupted: Ollama or the API keeps
+    generating until the call returns or hits its timeout (`FLOWPILOT_LLM_TIMEOUT_S`,
+    30 s by default, capped by the request budget).
+  - Its answer is then discarded and its spend is still recorded.
+  - The concurrency slot (2 recoveries) is held until the thread ends, so the bound
+    stays true.
+- **Service worker suspended or restarted.**
+  - A pending request dies with the worker; nothing can act on its answer.
+  - On restart, the interrupted run is marked failed (« le service worker de
+    l’extension a redémarré »).
+  - With the side panel closed, a proposal that needs confirmation is never executed.
+- **Covered by:** `tests/e2e/lifecycle.spec.ts` (shipped build, slow mock model,
+  worker stopped through CDP), `recovery.test.ts`, `test_limits_cancellation.py`.
+
+## Request limits
+
+The request body limit (`max_request_bytes`, 512 kB) is enforced by an ASGI
+middleware on the bytes actually received. A chunked request, or one with a false
+`Content-Length`, is cut off with `413` before parsing, and at most the limit is ever
+buffered (`limits.py`).
+
+## Inspecting usage and recovery logs
+
+- **Side panel.** Each recovered step shows its strategy and, for model recoveries, the
+  calls, tokens and time.
+- **Extension storage.** The full per-step log is stored in the run history:
+  `chrome.storage.local['flowpilot.runs'][i].log[j].recovery`. It holds `strategy`,
+  `modelCalls`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `costUsd`,
+  `latencyMs` (with the user's wait) and `serviceLatencyMs` (without it).
+- **Backend.**
+  - `GET /v1/metrics` (bearer token) aggregates recoveries, proposals, escalations,
+    verified outcomes, memory reuses, calls, input/output/cache tokens and cost.
+  - `GET /v1/memory` lists the verified corrections.
+  - Example: `curl -H "Authorization: Bearer $FLOWPILOT_API_TOKEN" http://127.0.0.1:8787/v1/metrics`
+- **Raw trace.** Each recovery's decision trace (states, timings, reasons) is stored in
+  the SQLite table `recoveries` (`trace_json`), next to its telemetry.
 
 ## Known limits
 
-- The backend routes are synchronous: aborting a replay stops the extension from
-  waiting, but an in-flight model call finishes (bounded by the 30 s timeout) and
-  holds one of the two recovery slots meanwhile. Spend of an aborted request is not
-  charged to the run budget.
-- The request size limit relies on `Content-Length`; a chunked body is not capped by
-  the application (the service is loopback-only).
+- An in-flight model call is not interrupted on cancellation (see above).
+- Spend of a request the extension aborted is recorded by the backend but not charged
+  to the extension's per-run budget.
 - The observation skips elements whose tag is outside the contract (`^[a-z][a-z0-9-]*$`).
+- About 10 s of every recovered step is the deterministic engine waiting for the
+  recorded element before it declares it missing.
 

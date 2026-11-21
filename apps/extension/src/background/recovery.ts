@@ -167,8 +167,12 @@ export function sharesIdentity(target: ElementStep['target'], candidate: Candida
 
 export function candidateLabel(candidate: Candidate): string {
   const label = candidate.name ?? candidate.text ?? candidate.attributes['aria-label'] ?? candidate.attributes.name ?? `<${candidate.tag}>`;
-  const where = candidate.context ?? candidate.section;
-  return `« ${label} » (${candidate.role ?? candidate.tag})${where ? `, ligne « ${where.slice(0, 80)} »` : ''}`;
+  const where = candidate.context
+    ? `, ligne « ${candidate.context.slice(0, 80)} »`
+    : candidate.section
+      ? `, dans « ${candidate.section.slice(0, 80)} »`
+      : '';
+  return `« ${label} » (${candidate.role ?? candidate.tag})${where}`;
 }
 
 // --- the recovery loop --------------------------------------------------------

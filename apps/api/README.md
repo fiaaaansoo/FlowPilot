@@ -28,11 +28,11 @@ Then, in the extension side panel: allow `http://127.0.0.1`, enable AI recovery,
 | --- | --- | --- | --- |
 | `none` (default) | - | 0 | Memory + semantic grounding only. Uncertain cases escalate to the user. |
 | `ollama` | local | 0 API cost | First-class. Structured output through Ollama's JSON-schema `format`. |
-| `openai-compatible` | local by default | 0 unless `FLOWPILOT_OPENAI_IS_PAID=1` | llama.cpp `llama-server`, vLLM, LM Studio. Needs `response_format: json_schema` support. |
+| `openai-compatible` | local on a loopback URL | 0 on loopback; any other URL counts as paid unless `FLOWPILOT_OPENAI_IS_LOCAL=1` | llama.cpp `llama-server`, vLLM, LM Studio. Needs `response_format: json_schema` support. |
 | `anthropic` | Claude API | billed per token | Optional. `pip install -e ".[anthropic]"` and `ANTHROPIC_API_KEY` from the Claude Console. |
 | `mock` | in process | 0 | Deterministic test double (`FLOWPILOT_MOCK_RULES`). |
 
-There is no automatic fallback between providers, and no paid provider is ever selected implicitly. A Claude.ai subscription (Pro/Max) is not a supported way to power FlowPilot; see `docs/adr/0004-claude-subscription-mode.md`.
+There is no automatic fallback between providers, and no paid provider is ever selected implicitly. A paid provider whose price is unknown (not in `pricing.py` and no `FLOWPILOT_PRICE_*`) refuses to start, so the cost budget always applies. A Claude.ai subscription (Pro/Max) is not a supported way to power FlowPilot; see `docs/adr/0004-claude-subscription-mode.md`.
 
 ## API (`flowpilot.recovery/v1`)
 
@@ -47,6 +47,8 @@ All routes except `GET /healthz` require `Authorization: Bearer <FLOWPILOT_API_T
 | `GET /v1/memory?origin=` | Inspect memorized corrections. |
 | `DELETE /v1/memory/{id}`, `DELETE /v1/memory?origin=` | Delete corrections. |
 | `GET /v1/metrics` | Aggregated recoveries, tokens, cache tokens, latency, cost, memory reuse. |
+
+Request bodies above 512 kB are rejected with `413` while they stream in. A client that disconnects (the extension stopped the replay) cancels its recovery at the next agent step; an in-flight model call still runs to completion or timeout, and its answer is discarded. Details: `docs/recovery.md`.
 
 Schemas: `flowpilot_api/contracts.py` (Pydantic) and `packages/shared/src/recovery.ts` (TypeScript). Canonical examples: `tests/contracts/*.json`.
 

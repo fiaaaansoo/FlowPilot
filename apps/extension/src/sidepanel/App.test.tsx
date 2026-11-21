@@ -21,7 +21,14 @@ function fakeApi(initial: Partial<PanelSnapshot> = {}, reply?: (command: Command
     Promise.resolve<CommandResponse>(reply?.(command) ?? { ok: true, value: snapshot.session }),
   );
   const requestOrigin = vi.fn(() => Promise.resolve(true));
-  const saveAiSettings = vi.fn((_settings: AiSettings) => Promise.resolve());
+  // Like chrome.storage: saving changes the snapshot and notifies the panel (which remounts the AI form).
+  const saveAiSettings = vi.fn((settings: AiSettings) => {
+    snapshot = { ...snapshot, ai: settings };
+    listeners.forEach((fn) => {
+      fn();
+    });
+    return Promise.resolve();
+  });
   const api: ExtensionApi = {
     snapshot: () => Promise.resolve(snapshot),
     subscribe: (fn) => {
@@ -231,6 +238,8 @@ describe('Side Panel', () => {
         mode: 'auto-when-safe',
       }),
     );
+    // The confirmation survives the remount caused by the new stored settings.
+    expect(await screen.findByText('Réglages enregistrés.')).toBeInTheDocument();
     await userEvent.click(button('Tester la connexion'));
     expect(await screen.findByText(/Connecté : ollama \(qwen2.5:3b\), local, sans frais d’API/)).toBeInTheDocument();
   });
