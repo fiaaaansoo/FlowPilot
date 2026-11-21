@@ -18,3 +18,5 @@
 - 2026-11-21 ✅ **finished**: `sprint-3-agent-recovery.md`
   ↳ ⚠️ check: entry in `HISTORY.md` + checklist `crew/TESTS/<chantier>.md` for sprint-3-agent-recovery.md
 - 2026-11-21 🧹 **lock of a task closed outside the main checkout purged**: `sprint-3-agent-recovery.md`
+- 2026-11-21 ▶️ **started**: `sprint-3-validation.md`
+- 2026-11-21 🧪 **tests validated**: `sprint-3-agent-recovery.md` (moved to `TESTS_DONE/`)

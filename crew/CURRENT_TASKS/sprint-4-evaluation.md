@@ -2,9 +2,9 @@
 
 Why: Sprint 3 proved the recovery pipeline is safe (0 incorrect actions) on one small demo, with one local model and single-sample cells. Sprint 4 turns this into a reproducible, statistically meaningful evaluation, and uses it to tune context, prompts and inference without weakening the confirmation policy.
 
-Zone : `apps/demo-site/`, `apps/api/flowpilot_api/`, `apps/extension/src/`, `tests/benchmark/`, `tests/e2e/`, `docs/`, `package.json`, `playwright.benchmark.config.ts`
+Zone : `apps/demo-site/`, `apps/api/`, `apps/extension/src/`, `packages/evaluation/`, `packages/shared/`, `tests/`, `docs/`, `package.json`, `package-lock.json`, `tsconfig.json`, `eslint.config.js`, `vitest.config.ts`, `playwright.benchmark.config.ts`, `.gitignore`, `.github/`
 
-Depends on: `sprint-3-validation.md`, and PRs #1 (Sprint 2) and #2 (Sprint 3) merged.
+Depends on: `sprint-3-validation.md` (paused, awaiting merge of PRs #1 and #2). Branch `feat/sprint-4-evaluation`, stacked on `feat/sprint-3-agentic-recovery`.
 
 Starting point (Sprint 3 handoff):
 - benchmark harness: `tests/benchmark/benchmark.spec.ts`;

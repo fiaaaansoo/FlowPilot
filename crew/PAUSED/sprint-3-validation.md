@@ -18,3 +18,4 @@ Zone : `package.json`, `playwright.config.ts`, `playwright.benchmark.config.ts`,
 
 Status 2026-11-21: PR #1 (Sprint 2 → `main`) and PR #2 (Sprint 3 → `feat/sprint-2-recorder`) open, CI green on both, nothing merged. Remaining before closure: owner review and merge of #1 then #2; native Chrome checks in `crew/TESTS/DEV/sprint-3-agent-recovery.md`; `/crew-close-task` (deep size: the `simplify` pass has not been run on this task's diff).
 
+Paused 2026-11-21: blocked on the owner (review and merge of PR #1 then PR #2, native Chrome checks in `crew/TESTS/DEV/sprint-3-agent-recovery.md`). Sprint 4 starts meanwhile on `feat/sprint-4-evaluation`, stacked on the Sprint 3 branch. Resume with `/crew-close-task` once merged.
