@@ -19,13 +19,13 @@ Hard rules carried over:
 
 Tasks are listed in priority order. Complexity: S < 1 day, M 1–3 days, L > 3 days.
 
-- [ ] **P1 · Evaluation dataset as data (M).** Move variants, workflows and expected elements out of the spec into versioned scenario files (`tests/benchmark/scenarios/*.json`): page mutation, recorded workflow, expected element or expected refusal.
+- [x] **P1 · Evaluation dataset as data (M).** Move variants, workflows and expected elements out of the spec into versioned scenario files (`tests/benchmark/scenarios/*.json`): page mutation, recorded workflow, expected element or expected refusal.
   - Depends on: nothing.
   - Accept when:
     - the existing 9 variants are reproduced from data and give the same verdicts as `s3-final`;
     - a scenario is added without code changes;
     - the scenario schema is validated at load.
-- [ ] **P2 · Expanded mutation scenarios (L).** At least 40 scenarios on 3+ page types (search form, results list, settings/destructive page, multi-step form).
+- [x] **P2 · Expanded mutation scenarios (L).** At least 40 scenarios on 3+ page types (search form, results list, settings/destructive page, multi-step form).
   - Cover:
     - label rewording and synonyms in FR/EN;
     - moved, wrapped or reordered elements;
@@ -42,13 +42,13 @@ Tasks are listed in priority order. Complexity: S < 1 day, M 1–3 days, L > 3 d
     - each scenario documents its expected verdict;
     - the deterministic baseline runs on all of them;
     - at least 25% of the scenarios expect a refusal or a confirmation.
-- [ ] **P3 · Statistical protocol and reporting (M).** Repeated runs with seeds and fixed configurations; Wilson confidence intervals for success, autonomy and refusal rates; latency percentiles (p50/p95/p99) when n ≥ 20; a run manifest with git SHA, model digest, Ollama version, prompt version, context limits and hardware.
+- [x] **P3 · Statistical protocol and reporting (M).** Repeated runs with seeds and fixed configurations; Wilson confidence intervals for success, autonomy and refusal rates; latency percentiles (p50/p95/p99) when n ≥ 20; a run manifest with git SHA, model digest, Ollama version, prompt version, context limits and hardware.
   - Depends on: P1.
   - Accept when:
     - a report states n and the confidence interval for every rate;
     - two runs of the same manifest give identical verdicts with a temperature-0 model;
     - the method doc is updated.
-- [ ] **P4 · Model comparison, local first (M).** Same scenarios on at least 3 local models through Ollama (e.g. qwen2.5:3b, qwen2.5:7b, llama3.2:3b) and one OpenAI-compatible runtime (llama.cpp or vLLM).
+- [x] **P4 · Model comparison, local first (M).** Same scenarios on at least 3 local models through Ollama (e.g. qwen2.5:3b, qwen2.5:7b, llama3.2:3b) and one OpenAI-compatible runtime (llama.cpp or vLLM).
   - Optional: one Anthropic model, only after explicit approval and with a cost cap.
   - Depends on: P2, P3.
   - Accept when, per model:
@@ -56,46 +56,35 @@ Tasks are listed in priority order. Complexity: S < 1 day, M 1–3 days, L > 3 d
     - the incorrect-action rate is reported (target 0);
     - service latency, tokens and peak memory are reported;
     - memory is measured one model at a time and the model is unloaded between runs.
-- [ ] **P5 · Context engineering comparisons (M).** Vary the max elements (6/12/24/80), the ranking on or off, deduplication, and the context or section fields; measure accuracy, tokens and latency on the noisy and injection scenarios.
+- [x] **P5 · Context engineering comparisons (M).** Vary the max elements (6/12/24/80), the ranking on or off, deduplication, and the context or section fields; measure accuracy, tokens and latency on the noisy and injection scenarios.
   - Depends on: P2, P3.
   - Accept when:
     - a documented recommendation for the default context size is backed by the data;
     - there is a context-rot curve (accuracy and tokens versus context size).
-- [ ] **P6 · Memory effectiveness (S).** Measure reuse rate, stale-correction rate after further page changes, and the effect of the scope rules (same step vs other workflow) over sequences of runs.
+- [x] **P6 · Memory effectiveness (S).** Measure reuse rate, stale-correction rate after further page changes, and the effect of the scope rules (same step vs other workflow) over sequences of runs.
   - Depends on: P2.
   - Accept when:
     - a report shows model calls saved by memory and incorrect reuses (target 0);
     - forgetting after a failed reuse is exercised in the benchmark.
-- [ ] **P7 · Prompt and inference optimization (M).** Tune the prompt wording (`recovery-v2`), output size, `num_ctx`, keep-alive and the deterministic wait before recovery (about 10 s of every recovered step today).
+- [x] **P7 · Prompt and inference optimization (M).** Tune the prompt wording (`recovery-v2`), output size, `num_ctx`, keep-alive and the deterministic wait before recovery (about 10 s of every recovered step today).
   - Depends on: P3, P4, P5.
   - Accept when:
     - every change is measured against `recovery-v1` on the same manifest;
     - no increase in incorrect actions;
     - end-to-end time of a recovered step is reduced, and the reduction is reported.
-- [ ] **P8 · Observability and evaluation dashboard (M).** A static report page generated from benchmark JSONL: per-scenario verdicts, rates with CIs, latency distributions, tokens and cost, memory, plus a recovery-trace viewer for the `recoveries` table.
+- [x] **P8 · Observability and evaluation dashboard (M).** A static report page generated from benchmark JSONL: per-scenario verdicts, rates with CIs, latency distributions, tokens and cost, memory, plus a recovery-trace viewer for the `recoveries` table.
   - Depends on: P3.
   - Accept when:
     - the report is generated by one command;
     - it renders offline;
     - it is linked from `docs/benchmarks/`;
     - it never shows field values or page HTML.
-- [ ] **P9 · Experimental write-up (S).** Method, threats to validity, results, and limitations in `docs/benchmarks/sprint-4.md`, plus a short demo recording of the side panel flow.
+- [x] **P9 · Experimental write-up (S).** Method, threats to validity, results, and limitations in `docs/benchmarks/sprint-4.md`, plus a short demo recording of the side panel flow.
   - Depends on: P4–P8.
   - Accept when every figure in the write-up is reproducible from a committed manifest and raw data.
 
-## Status (paused 2026-11-21, resume here)
+## Status (2026-11-21)
 
-Implemented and committed on `feat/sprint-4-evaluation` (up to `b248f34`), including the independent review fixes:
-- framework, dataset 1.1.0 (47 scenarios), runner, report, dashboard, figures (P1, P2, P3, P8 tooling);
-- adaptive settle 3 s, cross-origin gate, semantic long-label fix, evaluation knobs, prompt v2.
-
-Final campaign `s4-final` (code `b248f34`, settle 3000 ms), done so far: `deterministic`, `semantic`, `llm:qwen2.5:3b` x3 (all categories).
-Still to run, one batch per command (`FLOWPILOT_EVAL_RUN=s4-final npx playwright test -c playwright.benchmark.config.ts`):
-1. `FLOWPILOT_EVAL_CONFIGS=llm-memory:qwen2.5:3b`
-2. `llm:qwen2.5:7b`, then `llm:llama3.2:3b`, then `llm:qwen2.5:3b#v2`
-3. `llm:qwen2.5:3b@minimal,llm:qwen2.5:3b@extended,llm:qwen2.5:3b@unranked` with `FLOWPILOT_EVAL_SCENARIOS=semantic,security,ambiguous`
-4. Context rot, run `s4f-rot`: the 4 context configs on the 10 rot scenarios with `FLOWPILOT_EVAL_DISTRACTORS=0,50,150,300` (two batches of 5 scenarios)
-5. Settle study: rebuild with `VITE_FLOWPILOT_SETTLE_MS=0` and `=1500`, run `deterministic,llm:qwen2.5:3b` on `dynamic,semantic` (runs `s4f-settle0`, `s4f-settle1500`), then rebuild the default
-Then: `npm run eval:report`, `npm run eval:figures` into `docs/research/`, research report `docs/research/sprint-4-report.md`, `docs/benchmarks/sprint-4.md`, full checks, push, PR to `feat/sprint-3-agentic-recovery`, CI.
-Earlier runs `s4`, `s4-rot`, `s4-settle*` predate the review fixes: preliminary, not for the report.
-
+All actions done on `feat/sprint-4-evaluation` (up to `49ccd18`); final runs `s4-final`, `s4f-rot`, `s4f-settle*`; report `docs/research/sprint-4-report.md`.
+Done differently from the plan: P2 has 47 scenarios on 7 workflows of the demo site (2 held out), not several page types beyond it; P4 compared 3 local models (no OpenAI-compatible runtime run); P9 has no demo recording.
+Before closure: owner review of the PR, then `/crew-close-task` (deep size: the independent review is done, the `simplify` pass is not).
