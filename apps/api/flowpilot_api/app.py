@@ -31,7 +31,6 @@ from .contracts import (
     RecoveryResponse,
 )
 from .limits import BodyLimitMiddleware
-from .prompts import PROMPT_VERSION
 from .providers import ModelProvider, create_provider
 from .store import Correction, Store
 
@@ -88,7 +87,8 @@ def create_app(settings: Settings, *, provider: ModelProvider | None = None, sto
     def status() -> dict[str, object]:
         return {
             "contract": CONTRACT,
-            "promptVersion": PROMPT_VERSION,
+            "promptVersion": agent.prompt.version,
+            "memoryEnabled": settings.memory_enabled,
             "provider": agent.provider.name if agent.provider else "none",
             "model": agent.provider.model if agent.provider else None,
             "local": agent.provider.local if agent.provider else True,
@@ -118,7 +118,7 @@ def create_app(settings: Settings, *, provider: ModelProvider | None = None, sto
         if row["outcome"] is not None:
             raise HTTPException(status_code=409, detail="outcome_already_reported")
         stored = False
-        if body.verified and row["decision"] == "propose_target" and row["proposed_json"]:
+        if body.verified and settings.memory_enabled and row["decision"] == "propose_target" and row["proposed_json"]:
             proposed = Candidate.model_validate_json(row["proposed_json"])
             # Only the element the backend proposed can be memorized: the client cannot inject another one.
             if body.corrected_target is not None and fingerprint(body.corrected_target) != fingerprint(proposed):

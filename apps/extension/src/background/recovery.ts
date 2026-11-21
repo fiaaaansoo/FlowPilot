@@ -304,6 +304,7 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
       continue;
     }
     const { candidate, confidence, rationale, strategy, requiresConfirmation } = validated.value;
+    log.proposed = candidateLabel(candidate).slice(0, 300);
 
     // HUMAN: model doubt, irreversible element, original confirmation, or "always confirm" mode.
     let confirmed = false;

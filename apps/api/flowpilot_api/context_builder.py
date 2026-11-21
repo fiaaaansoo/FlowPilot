@@ -96,6 +96,7 @@ def build_context(
     usable: list[Candidate] | None = None,
     max_elements: int = 12,
     max_chars: int = 6_000,
+    ranking: bool = True,
 ) -> ContextPack:
     target = request.step.target
     compatible = [c for c in request.observation.elements if accepts(request.step.kind, c) and c.same_origin]
@@ -105,11 +106,9 @@ def build_context(
     for candidate in allowed:
         groups.setdefault(fingerprint(candidate), []).append(candidate)
 
-    ranked = sorted(
-        (ContextEntry(group[0], score(target, group[0]), len(group) - 1) for group in groups.values()),
-        key=lambda entry: entry.score.total,
-        reverse=True,
-    )
+    entries = [ContextEntry(group[0], score(target, group[0]), len(group) - 1) for group in groups.values()]
+    # Without ranking (evaluation knob), candidates keep their page order before truncation.
+    ranked = sorted(entries, key=lambda entry: entry.score.total, reverse=True) if ranking else entries
 
     kept: list[ContextEntry] = []
     used = 0

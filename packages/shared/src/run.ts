@@ -24,6 +24,8 @@ export interface RecoveryLog {
   latencyMs: number;
   /** Time spent in the recovery service (memory, grounding and model inference), without the user's wait. */
   serviceLatencyMs?: number;
+  /** Label of the last element proposed by recovery (page text, never a field value). */
+  proposed?: string;
   costUsd: number;
   provider?: string;
   model?: string;
@@ -83,6 +85,7 @@ function isRecoveryLog(raw: unknown): raw is RecoveryLog {
     isFiniteNumber(raw.outputTokens) &&
     isFiniteNumber(raw.latencyMs) &&
     (raw.serviceLatencyMs === undefined || isFiniteNumber(raw.serviceLatencyMs)) &&
+    (raw.proposed === undefined || typeof raw.proposed === 'string') &&
     isFiniteNumber(raw.costUsd)
   );
 }

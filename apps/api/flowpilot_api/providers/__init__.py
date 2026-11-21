@@ -15,7 +15,12 @@ def create_provider(settings: Settings) -> ModelProvider | None:
     if settings.provider == "ollama":
         from .ollama import OllamaProvider
 
-        return OllamaProvider(base_url=settings.ollama_url, model=settings.model or "", num_ctx=settings.ollama_num_ctx)
+        return OllamaProvider(
+            base_url=settings.ollama_url,
+            model=settings.model or "",
+            num_ctx=settings.ollama_num_ctx,
+            keep_alive=settings.ollama_keep_alive,
+        )
     if settings.provider == "openai-compatible":
         from .openai_compat import OpenAICompatibleProvider
 
