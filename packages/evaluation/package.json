@@ -1,0 +1,13 @@
+{
+  "name": "@flowpilot/evaluation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Evaluation framework: benchmark scenario schema, result aggregation, statistics, reports and dashboard. Not shipped with the extension.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

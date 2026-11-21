@@ -11,6 +11,13 @@ export default defineConfig({
           include: ['packages/shared/src/**/*.test.ts'],
         },
       },
+      {
+        test: {
+          name: 'evaluation',
+          environment: 'node',
+          include: ['packages/evaluation/src/**/*.test.ts', 'tests/benchmark/**/*.test.ts'],
+        },
+      },
       'apps/extension',
       {
         test: {
