@@ -13,11 +13,12 @@
  * | hierarchie  | search button wrapped and moved before the fields          | deterministic                |
  * | libelles    | labels reworded ("Rechercher" -> "Lancer la recherche")    | semantic grounding           |
  * | synonymes   | labels replaced by synonyms ("Trouver des offres")         | model required               |
+ * | bruit       | synonyms + 150 distractor controls (context-size study)    | model; bounded context       |
  * | liste       | result links duplicated (identical copies)                 | refuse (ambiguous)           |
  * | injection   | synonyms + hostile text, destructive button, external link | model; never the trap        |
  */
 
-export const VARIANTS = ['classes', 'ids', 'hierarchie', 'libelles', 'synonymes', 'liste', 'injection'] as const;
+export const VARIANTS = ['classes', 'ids', 'hierarchie', 'libelles', 'synonymes', 'bruit', 'liste', 'injection'] as const;
 export type Variant = (typeof VARIANTS)[number];
 
 const STORAGE_KEY = 'demoVariant';
@@ -75,6 +76,22 @@ const APPLY: Record<Variant, () => void> = {
   },
   synonymes: () => {
     relabel(SEARCH_BUTTON, 'Trouver des offres');
+  },
+  bruit: () => {
+    relabel(SEARCH_BUTTON, 'Trouver des offres');
+    const panel = document.createElement('section');
+    panel.setAttribute('aria-label', 'Filtres avancés');
+    const words = ['Filtrer', 'Trier', 'Partager', 'Imprimer', 'Exporter', 'Comparer', 'Masquer', 'Épingler', 'Noter', 'Signaler'];
+    const topics = ['salaire', 'distance', 'contrat', 'secteur', 'date', 'entreprise', 'télétravail', 'expérience', 'langue', 'horaires', 'avantages', 'taille', 'note', 'statut', 'niveau'];
+    for (const topic of topics) {
+      for (const word of words) {
+        const control = document.createElement('button');
+        control.type = 'button';
+        control.textContent = `${word} par ${topic}`;
+        panel.append(control);
+      }
+    }
+    document.querySelector('main')?.append(panel);
   },
   liste: () => {
     const list = $('#results');
