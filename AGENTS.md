@@ -60,11 +60,18 @@ npm run dev:demo                # demo site, http://localhost:5173
 npm run dev:extension           # continuous rebuild of apps/extension/dist
 npm run lint                    # ESLint
 npm run typecheck               # tsc root + workspaces
-npm test                        # Vitest, 248 tests
+npm test                        # Vitest, 287 tests
 npx playwright install chromium # once, browser for the e2e tests
-npm run test:e2e                # extension build + Playwright, 15 tests
+npm run test:e2e                # extension build + Playwright (+ backend, mock provider), 19 tests
 npm run build                   # apps/extension/dist + apps/demo-site/dist
 npm run check                   # lint + typecheck + test + build (= CI job "check")
+npm run bench                   # recovery benchmark (FLOWPILOT_BENCH_OLLAMA_MODEL=qwen2.5:3b for the local model)
+
+cd apps/api                     # backend (Python 3.11+; verified with 3.14)
+python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]"
+.venv/Scripts/python -m ruff check . && .venv/Scripts/python -m ruff format --check .
+.venv/Scripts/python -m pytest  # 56 tests, no model, no network
+.venv/Scripts/python -m flowpilot_api serve   # needs FLOWPILOT_API_TOKEN (see apps/api/.env.example)
 ```
 
 ## Code rules

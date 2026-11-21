@@ -1,5 +1,14 @@
 # Sprint 3 benchmark results
 
+> **Measured before the review fixes.** These results come from commit `52f53f0`. The
+> review fixes in `9e53fc3` tightened the decision policy: a model proposal now runs
+> without confirmation only when the deterministic ranking independently puts the same
+> element first, and never for value or submission steps. The guards measured here
+> were not loosened, so incorrect actions are not expected to rise; some autonomous
+> successes may now become confirmation prompts. A re-run was started but stopped by
+> the system for lack of memory. Re-run with the command below before quoting the
+> success columns as current.
+
 Run on 2026-11-21, Windows 11, Chromium (Playwright 1.65), shipped extension build,
 backend from `apps/api` (Python 3.14), local model `qwen2.5:3b` through Ollama, warmed
 before the run. Command:

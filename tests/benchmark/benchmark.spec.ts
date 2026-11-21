@@ -180,6 +180,16 @@ function judge(run: RunInfo, demoUrl: string, trap: boolean, success: RegExp): V
 }
 
 const results: Cell[] = [];
+const STAMP = new Date().toISOString().replace(/[:.]/g, '-');
+
+/** Written after every mode, so an interrupted run keeps the modes already measured. */
+function writeResults(): string {
+  mkdirSync(OUT_DIR, { recursive: true });
+  writeFileSync(path.join(OUT_DIR, `benchmark-${STAMP}.json`), JSON.stringify(results, null, 2));
+  const markdown = renderReport(results);
+  writeFileSync(path.join(OUT_DIR, 'latest.md'), markdown);
+  return markdown;
+}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -241,17 +251,13 @@ for (const [index, mode] of MODES.entries()) {
       }
     } finally {
       backend?.kill();
+      writeResults();
     }
   });
 }
 
 test.afterAll(() => {
-  mkdirSync(OUT_DIR, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  writeFileSync(path.join(OUT_DIR, `benchmark-${stamp}.json`), JSON.stringify(results, null, 2));
-  const markdown = renderReport(results);
-  writeFileSync(path.join(OUT_DIR, 'latest.md'), markdown);
-  console.log(`\n${markdown}`);
+  console.log(`\n${writeResults()}`);
 });
 
 function renderReport(cells: Cell[]): string {
