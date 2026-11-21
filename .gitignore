@@ -1,0 +1,46 @@
+# Dependencies / envs
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Graphify (regenerable via `graphify update .` / `graphify init`)
+graphify-out/*
+!graphify-out/.gitkeep
+
+# Internal state of the crew hooks (regenerated, no value in versioning it)
+crew/CLAUDE_CONTEXT/.task_state.json
+crew/CLAUDE_CONTEXT/crew_lock.json
+crew/CLAUDE_CONTEXT/crew_ignored.json
+crew/CLAUDE_CONTEXT/.gate_armed
+
+# Build outputs courants
+dist/
+build/
+.next/
+*.tsbuildinfo
+
+# OS / editors
+.DS_Store
+Thumbs.db
+
+# Claude Code — local/personal state, never shared between machines
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/crew-sessions.lock
+.claude/crew-batch-metrics.json
+.claude/worktrees/
+
+# Venv du crew-dashboard (crew/dashboard.bat)
+.dashboard-venv/
+
+# FlowPilot — builds et rapports de test
+playwright-report/
+test-results/
+coverage/
