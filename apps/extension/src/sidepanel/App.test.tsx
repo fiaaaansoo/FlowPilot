@@ -289,7 +289,13 @@ describe('Side Panel', () => {
   });
 
   it('shows why an AI proposal needs confirmation, before the model rationale', async () => {
-    const flow = { schemaVersion: 2, id: 'wf-1', name: 'Recherche', origin: 'http://localhost:5173', createdAt: '2026-11-21T10:00:00.000Z', steps: [{ id: 's1', kind: 'navigate', url: 'http://localhost:5173/' }, { id: 's2', kind: 'click', target: { tag: 'button', role: 'button', name: 'Rechercher', attributes: {}, css: 'button' } }] };
+    const flow = {
+      ...workflow,
+      steps: [
+        workflow.steps[0] as Workflow['steps'][number],
+        { id: 's2', kind: 'click' as const, target: { tag: 'button', name: 'Rechercher', attributes: {}, css: 'button' } },
+      ],
+    };
     const fake = fakeApi({
       session: {
         status: 'replaying',
