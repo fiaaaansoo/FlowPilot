@@ -8,6 +8,7 @@ import {
   patternFromUserInput,
   patternLabel,
   sanitizeUrl,
+  withoutQueryValues,
   urlMatches,
 } from './origin.js';
 
@@ -83,6 +84,17 @@ describe('sanitizeUrl', () => {
     ['http://x.fr/dept?code=75', 'http://x.fr/dept?code=75'],
   ])('%s → %s', (input, expected) => {
     expect(sanitizeUrl(input)).toBe(expected);
+  });
+});
+
+describe('withoutQueryValues', () => {
+  it.each([
+    ['https://bucket.example/f.pdf?X-Amz-Signature=abc&X-Amz-Credential=k', 'https://bucket.example/f.pdf?X-Amz-Signature&X-Amz-Credential'],
+    ['/offer.html?id=qa-nantes#apply', '/offer.html?id#apply'],
+    ['/app#access_token=secret', '/app'],
+    ['/results.html', '/results.html'],
+  ])('%s → %s', (input, expected) => {
+    expect(withoutQueryValues(input)).toBe(expected);
   });
 });
 

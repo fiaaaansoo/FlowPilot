@@ -82,6 +82,25 @@ const OAUTH_PAIR = ['code', 'state'] as const;
 const VOLATILE_PARAM = /^(utm_\w+|gclid|fbclid|msclkid|_|cb|ts|timestamp|t|rnd|random|cache|v)$/i;
 
 /**
+ * URL (absolute or relative) with every query value removed, keys kept, and a fragment that
+ * carries parameters dropped. Used for what is sent to the recovery service: a link may carry
+ * credentials under any parameter name (pre-signed URLs, reset links, e-mail addresses).
+ */
+export function withoutQueryValues(url: string): string {
+  const hashAt = url.indexOf('#');
+  const hash = hashAt === -1 ? '' : url.slice(hashAt);
+  const rest = hashAt === -1 ? url : url.slice(0, hashAt);
+  const queryAt = rest.indexOf('?');
+  if (queryAt === -1) return rest + (hash.includes('=') ? '' : hash);
+  const keys = rest
+    .slice(queryAt + 1)
+    .split('&')
+    .map((pair) => pair.split('=')[0] ?? '')
+    .filter(Boolean);
+  return rest.slice(0, queryAt) + (keys.length ? `?${keys.join('&')}` : '') + (hash.includes('=') ? '' : hash);
+}
+
+/**
  * Retire d'une URL ce qui ne doit jamais être stocké : paramètres de type jeton,
  * code, session, signature, et fragment porteur de paramètres (`#access_token=…`).
  */

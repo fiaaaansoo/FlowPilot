@@ -69,6 +69,9 @@ export function roleOf(el: Element): string | undefined {
 const LABELABLE = new Set(['input', 'select', 'textarea', 'button', 'meter', 'output', 'progress']);
 
 const NO_TEXT = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
+
+/** Explicit marking by the site or the user: the whole subtree is sensitive (values and text). */
+export const SENSITIVE_MARKER = '[data-flowpilot-sensitive], [data-private], [data-sensitive]';
 const TYPABLE_ROLES = new Set(['textbox', 'searchbox', 'combobox']);
 
 /** A field whose content the user types: native fields, rich-text editors and ARIA text boxes. */
@@ -80,7 +83,7 @@ export function isTypingField(el: Element): boolean {
 
 /** Texte d'un sous-arbre sans le contenu des champs (jamais de valeur saisie) ni des scripts. */
 export function textOf(el: Element): string {
-  if (isTypingField(el) || NO_TEXT.has(el.tagName)) return '';
+  if (isTypingField(el) || NO_TEXT.has(el.tagName) || el.matches(SENSITIVE_MARKER)) return '';
   let text = '';
   for (const node of Array.from(el.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE) text += node.textContent ?? '';

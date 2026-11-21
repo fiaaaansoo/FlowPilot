@@ -1,4 +1,4 @@
-import { LIMITS, MAX_OBSERVATION_ELEMENTS, fail, ok, sanitizeUrl, type Candidate, type Observation, type Result } from '@flowpilot/shared';
+import { LIMITS, MAX_OBSERVATION_ELEMENTS, fail, ok, sanitizeUrl, withoutQueryValues, type Candidate, type Observation, type Result } from '@flowpilot/shared';
 import { isIrreversibleAction, isSensitiveField, submissionScope } from '../recorder/classify';
 import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, sameOrigin, stableAttributes, submitsCrossOrigin, textOf } from './dom';
 
@@ -37,10 +37,8 @@ const SECTION = 'form, section, nav, header, footer, aside, main, fieldset, dial
 function sectionLabel(el: Element): string | undefined {
   const container = el.parentElement?.closest(SECTION);
   if (!container) return undefined;
-  const label =
-    container.getAttribute('aria-label') ??
-    container.querySelector(':scope > legend, :scope > h1, :scope > h2, :scope > h3, :scope > h4')?.textContent ??
-    container.ownerDocument.querySelector('h1')?.textContent;
+  const heading = container.querySelector(':scope > legend, :scope > h1, :scope > h2, :scope > h3, :scope > h4') ?? container.ownerDocument.querySelector('h1');
+  const label = container.getAttribute('aria-label') ?? (heading ? textOf(heading) : undefined);
   const text = normalizeText(label);
   return text || undefined;
 }
@@ -55,7 +53,9 @@ export function describeCandidate(el: Element, ref: string): Candidate {
   const text = normalizeText(textOf(el), 100); // '' for fields: values are never read
   const context = rowContext(el);
   const section = sectionLabel(el);
-  const candidate: Candidate = { ref, tag: el.tagName.toLowerCase(), attributes: stableAttributes(el) };
+  const attributes = stableAttributes(el);
+  if (attributes.href !== undefined) attributes.href = withoutQueryValues(attributes.href);
+  const candidate: Candidate = { ref, tag: el.tagName.toLowerCase(), attributes };
   if (role) candidate.role = role;
   if (name) candidate.name = name;
   if (text && text !== name) candidate.text = text;
@@ -86,7 +86,7 @@ export function observePage(doc: Document = document, newId: () => string = () =
   }
   const url = doc.defaultView?.location.href ?? '';
   current = { id: newId(), url, refs, observed };
-  return { snapshotId: current.id, url: sanitizeUrl(url), title: normalizeText(doc.title), elements };
+  return { snapshotId: current.id, url: withoutQueryValues(sanitizeUrl(url)), title: normalizeText(doc.title), elements };
 }
 
 /** Identity check: tag, role and accessible name must be unchanged since the snapshot. */

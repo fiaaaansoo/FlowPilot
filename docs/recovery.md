@@ -61,14 +61,17 @@ The response is either `propose_target` (`ref`, `confidence`, `strategy`
 - No field values, passwords, payment fields, OTP fields or hidden elements: the
   observation skips sensitive and invisible elements (hidden forms included) and never
   reads `value`. Rich-text editors (`contenteditable`) and ARIA text boxes count as
-  fields: their typed content never becomes a name, a text or a row context.
-- URLs are sanitized before leaving the page (query values dropped).
+  fields: their typed content never becomes a name, a text or a row context. The text
+  of a subtree marked `data-flowpilot-sensitive` / `data-private` / `data-sensitive` is
+  never used as a name, a text, a row context or a section label either.
+- The page URL, observed link `href`s and the recorded step's `href` leave the extension
+  with query values dropped (keys kept), so a pre-signed or reset link carries no secret.
 - No full-page HTML is sent or stored.
 - The model selects a `ref` among observed candidates. The action and any value
   always come from the recorded step. There is no tool that runs JavaScript,
   navigates, or types free text.
-- Cross-origin links, and forms or submit buttons whose `action`/`formaction` leaves
-  the origin, are removed from the model context and rejected by both the backend and
+- Cross-origin links, forms or submit buttons whose `action`/`formaction` leaves the
+  origin, and fields whose Enter would submit such a form, are removed from the model context and rejected by both the backend and
   the service worker.
 - Recovery never runs for `manualInput` steps, permission errors, sensitive-field
   restrictions, missing confirmations or policy errors (`isRecoverable`).

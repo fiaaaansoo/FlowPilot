@@ -117,6 +117,32 @@ describe('review regressions', () => {
 });
 
 
+describe('what leaves the page (security review)', () => {
+  it('never sends the text of a subtree marked sensitive, as context, section or label', () => {
+    document.body.innerHTML = `
+      <table><tr><td data-sensitive>FR76 3000 6000 0112 3456 7890 189</td><td><button>Copier</button></td></tr></table>
+      <section><h2 data-private>Compte de Jeanne Martin</h2><button>Exporter</button></section>
+      <span id="lbl"><span data-flowpilot-sensitive>4970 1234</span> Carte</span><button aria-labelledby="lbl">Voir</button>`;
+    const sent = JSON.stringify(observePage(document, ids));
+    expect(sent).toContain('Copier');
+    expect(sent).not.toContain('FR76');
+    expect(sent).not.toContain('Jeanne');
+    expect(sent).not.toContain('4970');
+  });
+
+  it('sends link and page URLs without query values', () => {
+    document.body.innerHTML = `<a href="https://localhost/dl?X-Amz-Signature=s3cr3t&X-Amz-Credential=AKIA">Télécharger</a>`;
+    window.history.replaceState(null, '', '/page?email=jeanne%40example.com');
+    const observation = observePage(document, ids);
+    const sent = JSON.stringify(observation);
+    expect(sent).not.toContain('s3cr3t');
+    expect(sent).not.toContain('AKIA');
+    expect(sent).not.toContain('jeanne');
+    expect(observation.elements[0]?.attributes.href).toBe('https://localhost/dl?X-Amz-Signature&X-Amz-Credential');
+    window.history.replaceState(null, '', '/');
+  });
+});
+
 describe('cross-origin submissions (Sprint 4)', () => {
   const step = (kind: 'click' | 'press') =>
     kind === 'press'
