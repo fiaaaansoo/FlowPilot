@@ -1,0 +1,35 @@
+{
+  "contract": "flowpilot.recovery/v1",
+  "binding": {
+    "runId": "run-1",
+    "workflowId": "wf-1",
+    "stepId": "s5",
+    "stepIndex": 4,
+    "origin": "http://localhost:5173",
+    "tabId": 12,
+    "snapshotId": "snap-1"
+  },
+  "failure": { "code": "TARGET_NOT_FOUND", "message": "L’élément « Rechercher » est introuvable dans la page." },
+  "step": {
+    "kind": "click",
+    "target": {
+      "tag": "button",
+      "role": "button",
+      "name": "Rechercher",
+      "attributes": { "type": "submit" },
+      "css": "#search-form > button"
+    }
+  },
+  "page": { "url": "http://localhost:5173/?variante=synonymes", "title": "Rechercher une offre | Offres du Coin" },
+  "observation": {
+    "snapshotId": "snap-1",
+    "elements": [
+      { "ref": "e1", "tag": "a", "role": "link", "name": "Offres du Coin", "attributes": { "href": "/" } },
+      { "ref": "e2", "tag": "button", "role": "button", "name": "Trouver des offres", "section": "Rechercher une offre", "attributes": { "type": "submit" } },
+      { "ref": "e3", "tag": "a", "role": "link", "name": "Espace candidat", "attributes": { "href": "/spa.html" } },
+      { "ref": "e4", "tag": "a", "role": "link", "name": "Partenaire", "sameOrigin": false, "attributes": { "href": "https://evil.example/collect" } }
+    ]
+  },
+  "attempts": [],
+  "budget": { "maxModelCalls": 3, "maxTokens": 12000, "timeoutMs": 30000, "maxCostUsd": 0.05 }
+}

@@ -1,0 +1,27 @@
+{
+  "contract": "flowpilot.recovery/v1",
+  "recoveryId": "1a2b3c4d5e6f708192a3b4c5d6e7f809",
+  "binding": {
+    "runId": "run-1",
+    "workflowId": "wf-1",
+    "stepId": "s5",
+    "stepIndex": 4,
+    "origin": "http://localhost:5173",
+    "tabId": 12,
+    "snapshotId": "snap-1"
+  },
+  "decision": { "type": "escalate", "strategy": "semantic", "reason": "No confident match and no model is configured." },
+  "usage": {
+    "provider": "none",
+    "model": null,
+    "promptVersion": "recovery-v1",
+    "modelCalls": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadTokens": null,
+    "cacheWriteTokens": null,
+    "latencyMs": 3,
+    "estimatedCostUsd": 0,
+    "contextElements": 2
+  }
+}
