@@ -65,6 +65,20 @@ describe('resolveRef / performByRef', () => {
     expect(resolveRef(snapshotId, ref).ok).toBe(false);
   });
 
+  it('rejects an element moved to another row or retargeted since the observation (node reused by a re-render)', () => {
+    document.body.innerHTML = `
+      <ul><li>Alerte A <button>Supprimer</button></li><li>Alerte B <span></span></li></ul>
+      <a href="/aide">Aide</a>`;
+    const { snapshotId, elements } = observePage(document, ids);
+    const remove = elements.find((e) => e.name === 'Supprimer')?.ref ?? '';
+    const help = elements.find((e) => e.name === 'Aide')?.ref ?? '';
+    const button = document.querySelector('button');
+    if (button) document.querySelectorAll('li')[1]?.append(button); // same node, now in row B
+    expect(resolveRef(snapshotId, remove)).toMatchObject({ ok: false, error: { code: 'TARGET_NOT_FOUND' } });
+    document.querySelector('a')?.setAttribute('href', 'https://evil.example/');
+    expect(resolveRef(snapshotId, help)).toMatchObject({ ok: false, error: { code: 'TARGET_NOT_FOUND' } });
+  });
+
   it('still requires a human for an irreversible element, even when proposed by recovery', () => {
     const ref = refOf('Supprimer l’alerte');
     const step = { id: 's', kind: 'click' as const, target: { tag: 'button', attributes: {}, css: 'x' } };

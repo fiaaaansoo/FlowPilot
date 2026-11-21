@@ -89,9 +89,20 @@ export function observePage(doc: Document = document, newId: () => string = () =
   return { snapshotId: current.id, url: withoutQueryValues(sanitizeUrl(url)), title: normalizeText(doc.title), elements };
 }
 
-/** Identity check: tag, role and accessible name must be unchanged since the snapshot. */
+/**
+ * Identity check: what the user and the service saw must still hold. Tag, role, name, row and
+ * section (a node reused by a re-render may now sit in another row), destination, and the
+ * judgements that decide whether a human is asked (irreversible, leaving the origin).
+ */
 const sameIdentity = (a: Candidate, b: Candidate): boolean =>
-  a.tag === b.tag && (a.role ?? '') === (b.role ?? '') && (a.name ?? '') === (b.name ?? '');
+  a.tag === b.tag &&
+  (a.role ?? '') === (b.role ?? '') &&
+  (a.name ?? '') === (b.name ?? '') &&
+  (a.context ?? '') === (b.context ?? '') &&
+  (a.section ?? '') === (b.section ?? '') &&
+  a.attributes.href === b.attributes.href &&
+  a.irreversible === b.irreversible &&
+  a.sameOrigin === b.sameOrigin;
 
 /**
  * Resolve a ref from the latest snapshot, refusing anything stale: other
