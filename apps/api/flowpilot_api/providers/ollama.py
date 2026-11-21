@@ -29,12 +29,20 @@ class OllamaProvider:
         self.num_ctx = num_ctx
         self._transport = transport
 
-    def complete(self, *, system: str, messages: list[Message], schema: dict[str, Any], timeout_s: float) -> ModelReply:
+    def complete(
+        self,
+        *,
+        system: str,
+        messages: list[Message],
+        schema: dict[str, Any],
+        timeout_s: float,
+        max_output_tokens: int = 1024,
+    ) -> ModelReply:
         body = {
             "model": self.model,
             "stream": False,
             "format": schema,
-            "options": {"temperature": 0, "num_ctx": self.num_ctx},
+            "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": max_output_tokens},
             "messages": [{"role": "system", "content": system}]
             + [{"role": m.role, "content": m.content} for m in messages],
         }

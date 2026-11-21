@@ -35,9 +35,9 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .config import Settings
-from .context_builder import ContextEntry, ContextPack, build_context, fingerprint, render_task, render_untrusted
+from .context_builder import ContextPack, build_context, fingerprint, render_task, render_untrusted
 from .contracts import Binding, Candidate, Decision, Escalate, ProposeTarget, RecoveryRequest, RecoveryResponse, Usage
-from .grounding import Score, accepts, decide, score
+from .grounding import Score, accepts, decide, rank, score
 from .pricing import estimate_cost
 from .prompts import ACTION_SCHEMA, PROMPT_VERSION, SYSTEM_PROMPT, render_user_message
 from .providers import Message, ModelProvider, ProviderError
@@ -49,6 +49,13 @@ AUTO_CONFIDENCE = 0.8
 CONFIRM_CONFIDENCE = 0.5
 STRUCTURAL_SUPPORT = 0.6
 MAX_INVALID_OUTPUTS = 2
+#: Output tokens requested per model call (a JSON action is ~60 tokens); capped further by the remaining budget.
+MAX_OUTPUT_TOKENS = 1024
+#: The model's choice must be the unique best deterministic match (ties do not count as agreement).
+AGREEMENT_MARGIN = 0.01
+MIN_OUTPUT_TOKENS = 128
+#: Steps where a model-chosen element would receive a recorded value or may submit a form.
+VALUE_OR_SUBMIT_KINDS = frozenset({"input", "select", "check", "press", "submit"})
 
 
 class State(StrEnum):
@@ -119,6 +126,8 @@ class RecoveryAgent:
         run.log(State.CLASSIFY, failure=request.failure.code, kind=request.step.kind, attempts=len(request.attempts))
         if request.step.kind == "manualInput":
             return self._escalate(run, "none", "Sensitive fields are never recovered automatically.")
+        if _origin(request.page.url) != request.binding.origin:
+            return self._escalate(run, "none", "The page is not on the workflow's origin.")
 
         usable = [
             c for c in elements if accepts(request.step.kind, c) and fingerprint(c) not in rejected and c.same_origin
@@ -238,7 +247,25 @@ class RecoveryAgent:
     def _call(self, run: _Run, messages: list[Message]) -> str:
         assert self.provider is not None
         attempts = 0
+        budget = run.request.budget
         while True:
+            estimated_input = (len(SYSTEM_PROMPT) + sum(len(m.content) for m in messages)) // 3
+            tokens_left = budget.max_tokens - run.input_tokens - run.output_tokens - estimated_input
+            max_output = min(MAX_OUTPUT_TOKENS, tokens_left)
+            if max_output < MIN_OUTPUT_TOKENS:
+                raise ProviderError("budget", "The token budget cannot cover another model call.")
+            worst_case = estimate_cost(
+                provider_local=self.provider.local,
+                model=self.provider.model,
+                input_tokens=estimated_input,
+                output_tokens=max_output,
+                cache_read_tokens=None,
+                cache_write_tokens=None,
+                override_input=self.settings.price_input,
+                override_output=self.settings.price_output,
+            )
+            if run.cost + worst_case > budget.max_cost_usd:
+                raise ProviderError("budget", "The cost budget cannot cover another model call.")
             run.calls += 1
             remaining = max(1.0, run.deadline - time.perf_counter())
             try:
@@ -247,6 +274,7 @@ class RecoveryAgent:
                     messages=messages,
                     schema=ACTION_SCHEMA,
                     timeout_s=min(self.settings.llm_timeout_s, remaining),
+                    max_output_tokens=max_output,
                 )
             except ProviderError as exc:
                 attempts += 1
@@ -325,14 +353,31 @@ class RecoveryAgent:
             return self._escalate(run, "llm", f"Proposal rejected: {problem}.")
 
         support: Score = score(request.step.target, candidate)
-        entry: ContextEntry | None = run.pack.shown(candidate.ref) if run.pack else None
-        duplicates = entry.duplicates if entry else 0
+        usable = [
+            c
+            for c in request.observation.elements
+            if accepts(request.step.kind, c) and fingerprint(c) not in rejected and c.same_origin
+        ]
+        # Identical copies are counted over the whole observation, not only the context pack: a copy found
+        # through find_elements is still a copy.
+        duplicates = sum(1 for c in usable if fingerprint(c) == fingerprint(candidate)) - 1
+        # Independent evidence: the deterministic ranking, which page text cannot steer towards an element
+        # unlike the recorded one, must put the same element clearly first. Model confidence alone never suffices.
+        ranked = rank(request.step.target, request.step.kind, usable)
+        agrees = (
+            bool(ranked)
+            and ranked[0].ref == candidate.ref
+            and (len(ranked) == 1 or ranked[0].total - ranked[1].total >= AGREEMENT_MARGIN)
+        )
         structural = support.structure >= STRUCTURAL_SUPPORT
         confident = action.confidence >= AUTO_CONFIDENCE
         human_requested = action.action == "request_user_confirmation"
+        # A model may not redirect a recorded value, or an implicit form submission, without the user.
+        sensitive_kind = request.step.kind in VALUE_OR_SUBMIT_KINDS
         if action.confidence < CONFIRM_CONFIDENCE:
             return self._escalate(run, "llm", f"Model confidence too low ({action.confidence:.2f}).")
-        auto = confident and structural and duplicates == 0 and not human_requested
+        run.log(State.VALIDATE, agrees=agrees, duplicates=duplicates, structural=structural)
+        auto = confident and structural and agrees and duplicates == 0 and not human_requested and not sensitive_kind
         return self._propose(
             run, candidate, action.confidence, "llm", action.reason or "Model proposal.", force_confirm=not auto
         )
@@ -435,3 +480,10 @@ def _same_element(stored: Candidate, current: Candidate) -> bool:
 
 def _describe(candidate: Candidate) -> dict[str, Any]:
     return candidate.model_dump(by_alias=True, exclude_none=True, exclude_defaults=True) | {"ref": candidate.ref}
+
+
+def _origin(url: str) -> str:
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}".lower()

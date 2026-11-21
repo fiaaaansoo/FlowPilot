@@ -1,6 +1,6 @@
 import { LIMITS, fail, ok, sanitizeUrl, type Candidate, type Observation, type Result } from '@flowpilot/shared';
 import { isIrreversibleAction, isSensitiveField } from '../recorder/classify';
-import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, stableAttributes } from './dom';
+import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, stableAttributes, textOf } from './dom';
 
 /**
  * Page observation for AI recovery (content script).
@@ -45,6 +45,8 @@ function sectionLabel(el: Element): string | undefined {
   return text || undefined;
 }
 
+const CONTRACT_TAG = /^[a-z][a-z0-9-]{0,31}$/;
+
 function sameOrigin(el: Element): boolean {
   const href = el.getAttribute('href');
   if (!href || !(el instanceof HTMLAnchorElement || el instanceof HTMLAreaElement)) return true;
@@ -60,7 +62,7 @@ export function describeCandidate(el: Element, ref: string): Candidate {
   const isField = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
   const role = roleOf(el);
   const name = accessibleName(el);
-  const text = isField ? '' : normalizeText(el.textContent, 100);
+  const text = isField ? '' : normalizeText(textOf(el), 100);
   const context = rowContext(el);
   const section = sectionLabel(el);
   const candidate: Candidate = { ref, tag: el.tagName.toLowerCase(), attributes: stableAttributes(el) };
@@ -83,6 +85,8 @@ export function observePage(doc: Document = document, newId: () => string = () =
     if (elements.length >= MAX_OBSERVED_ELEMENTS) break;
     if (!(el instanceof HTMLFormElement) && !isVisible(el)) continue;
     if (isSensitiveField(el)) continue;
+    // Tags outside the recovery contract (e.g. custom elements with "_" or ".") are not observable.
+    if (!CONTRACT_TAG.test(el.tagName.toLowerCase())) continue;
     const ref = `e${elements.length + 1}`;
     const candidate = describeCandidate(el, ref);
     refs.set(ref, new WeakRef(el));

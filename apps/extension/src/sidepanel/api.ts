@@ -3,6 +3,7 @@ import {
   IDLE,
   errorMessage,
   fail,
+  isLoopbackEndpoint,
   isRecord,
   parseAiSettings,
   type AiSettings,
@@ -83,6 +84,9 @@ export const EMPTY_SNAPSHOT: PanelSnapshot = {
 
 /** Authenticated call to the loopback backend. Errors are explicit, never thrown. */
 async function backendFetch(settings: AiSettings, path: string, init: RequestInit = {}): Promise<Result<unknown>> {
+  if (!isLoopbackEndpoint(settings.endpoint)) {
+    return fail('RECOVERY_UNAVAILABLE', 'Adresse refusée : seul un service local est accepté.');
+  }
   try {
     const response = await fetch(`${settings.endpoint}${path}`, {
       ...init,

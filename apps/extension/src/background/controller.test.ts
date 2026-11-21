@@ -463,4 +463,24 @@ describe('SessionController — AI recovery', () => {
     expect(env.refCalls).toEqual([{ ref: 'e2', confirmed: true }]);
     expect((await runs.list())[0]?.outcome).toBe('succeeded');
   });
+
+  it('two consecutive recovered steps both get their outcome reported', async () => {
+    env.aiSettings = enabled;
+    const id = await seed(
+      makeWorkflow([
+        { id: 's1', kind: 'navigate', url: 'http://localhost:5173/' },
+        { id: 's2', kind: 'click', target: target('Rechercher') },
+        { id: 's3', kind: 'click', target: target('Valider') },
+        { id: 's4', kind: 'waitForNavigation', url: 'http://localhost:5173/results.html' },
+      ]),
+    );
+    await controller.handle({ type: 'replay/start', workflowId: id });
+    await controller.settled();
+    expect((await runs.list())[0]?.outcome).toBe('succeeded');
+    expect(reported).toEqual([
+      { id: 'rec-1', verified: true },
+      { id: 'rec-1', verified: true },
+    ]);
+  });
 });
+

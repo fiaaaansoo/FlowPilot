@@ -87,7 +87,7 @@ def test_propose_then_verified_outcome_feeds_memory(client: TestClient) -> None:
     recovery_id = body["recoveryId"]
 
     outcome = client.post(f"/v1/recovery/{recovery_id}/outcome", json=fixture_json("outcome-report.json"), headers=AUTH)
-    assert outcome.json() == {"contract": "flowpilot.recovery/v1", "memorized": True}
+    assert outcome.json() == {"contract": "flowpilot.recovery/v1", "memorized": True, "forgotten": 0}
     again = client.post(f"/v1/recovery/{recovery_id}/outcome", json=fixture_json("outcome-report.json"), headers=AUTH)
     assert again.status_code == 409
 
@@ -125,3 +125,15 @@ def test_failed_outcome_is_recorded_but_not_memorized(client: TestClient) -> Non
     assert client.post(f"/v1/recovery/{recovery_id}/outcome", json=report, headers=AUTH).json()["memorized"] is False
     assert client.get("/v1/metrics", headers=AUTH).json()["incorrectOrRejected"] == 1
     assert client.post("/v1/recovery/unknown/outcome", json=report, headers=AUTH).status_code == 404
+
+
+def test_failed_reuse_of_a_memorized_correction_forgets_it(client: TestClient) -> None:
+    first = client.post("/v1/recovery/propose", json=fixture_json("recovery-request.json"), headers=AUTH).json()
+    client.post(f"/v1/recovery/{first['recoveryId']}/outcome", json=fixture_json("outcome-report.json"), headers=AUTH)
+    reuse = client.post("/v1/recovery/propose", json=fixture_json("recovery-request.json"), headers=AUTH).json()
+    assert reuse["decision"]["strategy"] == "memory"
+
+    failed = {"contract": "flowpilot.recovery/v1", "verified": False, "detail": "next step failed"}
+    result = client.post(f"/v1/recovery/{reuse['recoveryId']}/outcome", json=failed, headers=AUTH).json()
+    assert result["forgotten"] == 1
+    assert client.get("/v1/memory", headers=AUTH).json() == []

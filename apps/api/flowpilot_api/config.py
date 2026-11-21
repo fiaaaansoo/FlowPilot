@@ -10,6 +10,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
 PROVIDERS = ("none", "ollama", "openai-compatible", "anthropic", "mock")
 
 
@@ -94,7 +96,7 @@ def load_settings(env_file: Path | None = None) -> Settings:
         raise ConfigError(f"FLOWPILOT_PROVIDER must be one of {', '.join(PROVIDERS)}")
     host = os.environ.get("FLOWPILOT_HOST", "127.0.0.1")
     allow_remote = _flag("FLOWPILOT_ALLOW_REMOTE")
-    if host not in {"127.0.0.1", "localhost", "::1"} and not allow_remote:
+    if host not in LOOPBACK_HOSTS and not allow_remote:
         raise ConfigError("Refusing to listen on a non-loopback address without FLOWPILOT_ALLOW_REMOTE=1.")
 
     rules: dict[str, str] = {}
@@ -105,6 +107,10 @@ def load_settings(env_file: Path | None = None) -> Settings:
 
     price_in = os.environ.get("FLOWPILOT_PRICE_INPUT_PER_MTOK")
     price_out = os.environ.get("FLOWPILOT_PRICE_OUTPUT_PER_MTOK")
+    model = os.environ.get("FLOWPILOT_MODEL") or None
+    openai_base_url = os.environ.get("FLOWPILOT_OPENAI_BASE_URL") or None
+    openai_is_local = _openai_is_local(openai_base_url)
+    _require_price(provider, model, openai_is_local, price_in, price_out)
     return Settings(
         api_token=token,
         host=host,
@@ -114,12 +120,12 @@ def load_settings(env_file: Path | None = None) -> Settings:
             o.strip() for o in os.environ.get("FLOWPILOT_ALLOWED_ORIGINS", "").split(",") if o.strip()
         ),
         provider=provider,
-        model=os.environ.get("FLOWPILOT_MODEL") or None,
+        model=model,
         ollama_url=os.environ.get("FLOWPILOT_OLLAMA_URL", "http://127.0.0.1:11434"),
         ollama_num_ctx=_int("FLOWPILOT_OLLAMA_NUM_CTX", 4096),
-        openai_base_url=os.environ.get("FLOWPILOT_OPENAI_BASE_URL") or None,
+        openai_base_url=openai_base_url,
         openai_api_key=os.environ.get("FLOWPILOT_OPENAI_API_KEY") or None,
-        openai_is_local=not _flag("FLOWPILOT_OPENAI_IS_PAID"),
+        openai_is_local=openai_is_local,
         anthropic_effort=os.environ.get("FLOWPILOT_ANTHROPIC_EFFORT", "medium"),
         llm_timeout_s=_float("FLOWPILOT_LLM_TIMEOUT_S", 30.0),
         llm_max_retries=_int("FLOWPILOT_LLM_MAX_RETRIES", 1),
@@ -129,4 +135,35 @@ def load_settings(env_file: Path | None = None) -> Settings:
         mock_rules=rules,
         price_input=float(price_in) if price_in else None,
         price_output=float(price_out) if price_out else None,
+    )
+
+
+def _openai_is_local(base_url: str | None) -> bool:
+    """A loopback server is local (no API charge); any other endpoint is treated as paid unless declared local."""
+    if _flag("FLOWPILOT_OPENAI_IS_PAID"):
+        return False
+    if _flag("FLOWPILOT_OPENAI_IS_LOCAL"):
+        return True
+    from urllib.parse import urlsplit
+
+    host = (urlsplit(base_url).hostname or "") if base_url else ""
+    return host in LOOPBACK_HOSTS
+
+
+def _require_price(provider: str, model: str | None, local: bool, price_in: str | None, price_out: str | None) -> None:
+    """Refuse to start a paid provider whose cost cannot be estimated: the cost budget would not apply."""
+    from .pricing import CLAUDE_PRICES
+
+    if price_in and price_out:
+        return
+    if provider == "anthropic":
+        from .providers.anthropic_api import DEFAULT_MODEL
+
+        if (model or DEFAULT_MODEL) in CLAUDE_PRICES:
+            return
+    elif provider != "openai-compatible" or local:
+        return
+    raise ConfigError(
+        f"No price is known for model {model or '(default)'} of provider {provider}: set "
+        "FLOWPILOT_PRICE_INPUT_PER_MTOK and FLOWPILOT_PRICE_OUTPUT_PER_MTOK so the cost budget can be enforced."
     )

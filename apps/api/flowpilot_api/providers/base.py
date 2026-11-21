@@ -65,4 +65,5 @@ class ModelProvider(Protocol):
         messages: list[Message],
         schema: dict[str, Any],
         timeout_s: float,
+        max_output_tokens: int = 1024,
     ) -> ModelReply: ...

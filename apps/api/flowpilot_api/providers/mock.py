@@ -41,7 +41,15 @@ class MockProvider:
         self._confidence = confidence
         self.calls: list[list[Message]] = []
 
-    def complete(self, *, system: str, messages: list[Message], schema: dict[str, Any], timeout_s: float) -> ModelReply:
+    def complete(
+        self,
+        *,
+        system: str,
+        messages: list[Message],
+        schema: dict[str, Any],
+        timeout_s: float,
+        max_output_tokens: int = 1024,
+    ) -> ModelReply:
         self.calls.append(list(messages))
         usage = ProviderUsage(input_tokens=len(system + "".join(m.content for m in messages)) // 4, output_tokens=40)
         if self._responses:

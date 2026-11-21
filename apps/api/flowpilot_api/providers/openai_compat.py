@@ -47,10 +47,19 @@ class OpenAICompatibleProvider:
         self._api_key = api_key
         self._transport = transport
 
-    def complete(self, *, system: str, messages: list[Message], schema: dict[str, Any], timeout_s: float) -> ModelReply:
+    def complete(
+        self,
+        *,
+        system: str,
+        messages: list[Message],
+        schema: dict[str, Any],
+        timeout_s: float,
+        max_output_tokens: int = 1024,
+    ) -> ModelReply:
         body = {
             "model": self.model,
             "temperature": 0,
+            "max_tokens": max_output_tokens,
             "messages": [{"role": "system", "content": system}]
             + [{"role": m.role, "content": m.content} for m in messages],
             "response_format": {

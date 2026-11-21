@@ -176,6 +176,13 @@ class Store:
                 "UPDATE corrections SET uses = uses + 1, last_used_at = ? WHERE id = ?", (_now(), correction_id)
             )
 
+    def forget_target(self, *, origin: str, target_fp: str) -> int:
+        """Drops the corrections of one recorded target on one origin (after a failed reuse)."""
+        with self._tx() as conn:
+            return conn.execute(
+                "DELETE FROM corrections WHERE origin = ? AND target_fp = ?", (origin, target_fp)
+            ).rowcount
+
     def forget(self, correction_id: int) -> bool:
         with self._tx() as conn:
             return conn.execute("DELETE FROM corrections WHERE id = ?", (correction_id,)).rowcount > 0

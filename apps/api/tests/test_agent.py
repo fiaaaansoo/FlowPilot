@@ -150,9 +150,64 @@ def test_budgets_are_enforced(store: Store) -> None:
     decision = agent.propose(make_request(target=SEARCH, elements=PAGE, budget={"maxModelCalls": 2})).decision
     assert isinstance(decision, Escalate) and "call budget" in decision.reason
 
-    agent, _ = agent_with(store, act("propose_target", "e2", 0.9))
+    # The token budget is checked before calling: no call is made when it cannot cover one.
+    agent, provider = agent_with(store, act("propose_target", "e2", 0.9))
     decision = agent.propose(make_request(target=SEARCH, elements=PAGE, budget={"maxTokens": 10})).decision
-    assert isinstance(decision, Escalate) and "Token budget" in decision.reason
+    assert isinstance(decision, Escalate) and "token budget" in decision.reason.lower()
+    assert provider.calls == []
+
+
+def test_paid_call_is_refused_when_its_worst_case_cost_exceeds_the_budget(store: Store) -> None:
+    provider = MockProvider(responses=[act("propose_target", "e2", 0.9)])
+    provider.local = False
+    provider.model = "claude-opus-5-5"
+    agent = RecoveryAgent(settings=Settings(api_token="x" * 32, provider="mock"), store=store, provider=provider)
+    decision = agent.propose(make_request(target=SEARCH, elements=PAGE, budget={"maxCostUsd": 0.0001})).decision
+    assert isinstance(decision, Escalate) and "cost budget" in decision.reason
+    assert provider.calls == []
+
+
+# --- review regressions: model confidence alone never authorizes an action -------
+
+
+def test_confident_model_choice_unlike_the_recorded_target_needs_confirmation(store: Store) -> None:
+    # Injected text could push the model to any button with high confidence: e5 is not the best deterministic match.
+    page = [*PAGE, element("e5", "Partager avec tous", attributes={"type": "button"})]
+    agent, _ = agent_with(store, act("propose_target", "e5", 0.99, "the page says so"))
+    decision = agent.propose(make_request(target=SEARCH, elements=page)).decision
+    assert isinstance(decision, ProposeTarget) and decision.ref == "e5"
+    assert decision.requires_confirmation is True
+
+
+def test_identical_copy_found_through_tools_still_needs_confirmation(store: Store) -> None:
+    copy = {"type": "submit"}
+    page = [
+        element("e1", "Trouver des offres", attributes=copy),
+        element("e2", "Trouver des offres", attributes=copy),
+    ]
+    agent, _ = agent_with(store, act("find_elements", query="offres"), act("propose_target", "e2", 0.95, "second copy"))
+    decision = agent.propose(make_request(target=SEARCH, elements=page)).decision
+    assert isinstance(decision, ProposeTarget) and decision.ref == "e2"
+    assert decision.requires_confirmation is True
+
+
+@pytest.mark.parametrize("kind", ["input", "press"])
+def test_model_cannot_redirect_a_value_or_a_submission_without_confirmation(store: Store, kind: str) -> None:
+    target = {"tag": "input", "role": "textbox", "name": "Mots-clés", "attributes": {"name": "q"}, "css": "#q"}
+    page = [element("e7", "Intitulé du poste", role="textbox", tag="input", attributes={"name": "q"})]
+    agent, _ = agent_with(store, act("propose_target", "e7", 0.95, "renamed field"))
+    decision = agent.propose(make_request(target=target, kind=kind, elements=page)).decision
+    assert isinstance(decision, ProposeTarget) and decision.requires_confirmation is True
+
+
+def test_page_on_another_origin_is_never_recovered(store: Store) -> None:
+    agent, provider = agent_with(store, act("propose_target", "e2", 0.95))
+    request = make_request(target=SEARCH, elements=PAGE)
+    raw = request.model_dump(by_alias=True)
+    raw["page"]["url"] = "https://other.example/"
+    decision = agent.propose(type(request).model_validate(raw)).decision
+    assert isinstance(decision, Escalate) and "origin" in decision.reason
+    assert provider.calls == []
 
 
 def test_repeated_rejected_proposal_is_refused(store: Store) -> None:

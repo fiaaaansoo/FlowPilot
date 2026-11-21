@@ -104,6 +104,15 @@ describe('recoverStep', () => {
     expect(result.log).toMatchObject({ outcome: 'recovered', attempts: 1, modelCalls: 1, inputTokens: 700, provider: 'mock' });
   });
 
+  it('never observes for the backend when the tab is on another origin than the workflow', async () => {
+    const { recoveryEnv, calls } = env();
+    const { client, requests } = backend(propose('e2'));
+    const result = await recoverStep(recoveryEnv, client, context({ origin: 'https://bank.example' }));
+    expect(result).toMatchObject({ ok: false, log: { outcome: 'escalated' } });
+    expect(requests).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
   it('escalates when the backend escalates, without touching the page', async () => {
     const { recoveryEnv, calls } = env();
     const result = await recoverStep(recoveryEnv, backend({ type: 'escalate', strategy: 'llm', reason: 'deux boutons possibles' }).client, context());

@@ -68,9 +68,12 @@ export function roleOf(el: Element): string | undefined {
 
 const LABELABLE = new Set(['input', 'select', 'textarea', 'button', 'meter', 'output', 'progress']);
 
-/** Texte d'un sous-arbre sans le contenu des champs (jamais de valeur saisie). */
-function textOf(el: Element): string {
+const NO_TEXT = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
+
+/** Texte d'un sous-arbre sans le contenu des champs (jamais de valeur saisie) ni des scripts. */
+export function textOf(el: Element): string {
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return '';
+  if (NO_TEXT.has(el.tagName)) return '';
   let text = '';
   for (const node of Array.from(el.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE) text += node.textContent ?? '';

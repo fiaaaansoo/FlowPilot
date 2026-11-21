@@ -84,11 +84,22 @@ Deterministic first, model last:
    a JSON schema by each provider's structured-output feature and re-validated with
    Pydantic; two invalid outputs end the loop.
 
-A model proposal is executed without asking only if confidence ≥ 0.8 **and**
-structural support ≥ 0.6 **and** the element has no identical copy **and** the
-model did not ask for confirmation. Between 0.5 and these thresholds, the user is
-asked. Below 0.5, the backend escalates. Model confidence alone never authorizes
-an action.
+A model proposal is executed without asking only if all of these hold:
+
+- model confidence ≥ 0.8 and the model did not ask for confirmation;
+- **independent agreement**: the deterministic ranking of all usable observed
+  elements against the recorded target puts the same element strictly first
+  (page text cannot move an element unlike the recorded one to the top);
+- structural support ≥ 0.6 (same role, tag or type);
+- no identical copy anywhere in the observation (counted over the whole page, not
+  only the elements shown to the model);
+- the step is a click: a model may never redirect a recorded value (`input`,
+  `select`, `check`) or a form submission (`press`, `submit`) without the user.
+
+Otherwise, from confidence 0.5 the user is asked; below 0.5, the backend escalates.
+Model confidence alone never authorizes an action. A page whose origin differs
+from the workflow's origin is never recovered (checked by both the extension and
+the backend).
 
 The service worker then applies its own rules regardless of the backend: the
 response binding must match, the ref must be in the observation, the element must
@@ -101,13 +112,19 @@ refuses an irreversible element without confirmation.
 ## Budgets
 
 Per request (backend): 3 model calls, 12 000 tokens, 30 s, 0.05 USD by default.
+Budgets are checked **before** each call: the output is capped by the remaining
+tokens (at most 1 024 per call), and a paid call whose worst-case cost exceeds what
+is left is not made. A paid provider without a known price refuses to start, and an
+OpenAI-compatible endpoint that is not loopback counts as paid unless declared
+local (`FLOWPILOT_OPENAI_IS_LOCAL=1`).
 Per run (extension): 3 recoveries, 2 attempts per step, 6 model calls,
 30 000 tokens, 0.10 USD, 90 s per request. An exhausted budget escalates.
 
 ## Prompt injection
 
-Page text is placed inside `<untrusted_page_content>` and the system prompt says it
-is data, but the defense does not rely on wording. The model cannot do anything
+Page text is placed inside `<untrusted_page_content>` (with `<` escaped, so it
+cannot close the block) and the system prompt says it is data, but the defense
+does not rely on wording. The model cannot do anything
 except pick an observed ref; hostile instructions cannot add tools, change the
 action or the value, reach another origin, or skip the confirmation required for
 irreversible elements. `tests/e2e/recovery.spec.ts` replays against a page whose
@@ -141,7 +158,8 @@ SQLite (`FLOWPILOT_DB_PATH`), two tables:
 
 Corrections can be listed and deleted from the side panel or
 `GET/DELETE /v1/memory`. A memorized correction is revalidated against the live
-page every time (exactly one matching element) before reuse.
+page every time (exactly one matching element) before reuse, and is deleted as soon
+as a reuse is reported as failed.
 
 ## Prompts, caching and telemetry
 
@@ -162,3 +180,14 @@ tokens and time per recovered step.
 - End to end: `tests/e2e/recovery.spec.ts` on the shipped build with the real
   backend and the mock provider.
 - Benchmark: `npm run bench`, see [benchmarks](benchmarks/README.md).
+
+## Known limits
+
+- The backend routes are synchronous: aborting a replay stops the extension from
+  waiting, but an in-flight model call finishes (bounded by the 30 s timeout) and
+  holds one of the two recovery slots meanwhile. Spend of an aborted request is not
+  charged to the run budget.
+- The request size limit relies on `Content-Length`; a chunked body is not capped by
+  the application (the service is loopback-only).
+- The observation skips elements whose tag is outside the contract (`^[a-z][a-z0-9-]*$`).
+

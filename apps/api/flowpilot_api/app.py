@@ -131,8 +131,13 @@ def create_app(settings: Settings, *, provider: ModelProvider | None = None, sto
                 strategy=row["strategy"],
             )
             stored = True
+        forgotten = 0
+        if not body.verified and row["strategy"] == "memory" and row["original_json"]:
+            # A memorized correction that did not work is not trusted again.
+            original = ElementTarget.model_validate_json(row["original_json"])
+            forgotten = store.forget_target(origin=row["origin"], target_fp=fingerprint(original))
         store.set_outcome(recovery_id, "verified" if body.verified else "failed", body.detail)
-        return {"contract": CONTRACT, "memorized": stored}
+        return {"contract": CONTRACT, "memorized": stored, "forgotten": forgotten}
 
     @app.get("/v1/memory", dependencies=auth)
     def list_memory(origin: Annotated[str | None, Query(max_length=200)] = None) -> list[dict[str, object]]:

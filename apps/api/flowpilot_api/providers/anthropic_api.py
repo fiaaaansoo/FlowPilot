@@ -46,14 +46,22 @@ class AnthropicProvider:
             client = anthropic.Anthropic(max_retries=0)  # retries are owned by the agent's budget
         self._client = client
 
-    def complete(self, *, system: str, messages: list[Message], schema: dict[str, Any], timeout_s: float) -> ModelReply:
+    def complete(
+        self,
+        *,
+        system: str,
+        messages: list[Message],
+        schema: dict[str, Any],
+        timeout_s: float,
+        max_output_tokens: int = 1024,
+    ) -> ModelReply:
         import anthropic
 
         started = time.perf_counter()
         try:
             response = self._client.with_options(timeout=timeout_s).messages.create(
                 model=self.model,
-                max_tokens=self.max_tokens,
+                max_tokens=min(self.max_tokens, max_output_tokens),
                 system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                 messages=[{"role": m.role, "content": m.content} for m in messages],
                 output_config={"effort": self.effort, "format": {"type": "json_schema", "schema": schema}},

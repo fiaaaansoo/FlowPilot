@@ -57,7 +57,8 @@ function actOn(el: Element, step: ElementStep, strategy: string, options: Perfor
   }
   // Défense en profondeur : l'élément effectivement trouvé est rejugé dans la page.
   // Une action qui paraît irréversible n'est jamais exécutée sans validation humaine.
-  if ((step.kind === 'click' || step.kind === 'submit' || step.kind === 'press') && !confirmed && isIrreversibleAction(el)) {
+  const judged = step.kind === 'press' ? (el.closest('form') ?? el) : el;
+  if ((step.kind === 'click' || step.kind === 'submit' || step.kind === 'press') && !confirmed && isIrreversibleAction(judged)) {
     return fail('CONFIRMATION_REQUIRED', 'Cette action semble irréversible : confirmation humaine requise.');
   }
   if (el instanceof HTMLElement) el.scrollIntoView({ block: 'center', inline: 'nearest' });

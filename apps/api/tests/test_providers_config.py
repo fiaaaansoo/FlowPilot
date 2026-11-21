@@ -232,3 +232,27 @@ def test_dotenv_file_does_not_override_the_environment(monkeypatch: pytest.Monke
     monkeypatch.delenv("FLOWPILOT_PORT", raising=False)
     settings = load_settings(env)
     assert settings.port == 9999 and settings.api_token == TOKEN
+
+
+def test_paid_providers_need_a_known_price(monkeypatch: pytest.MonkeyPatch) -> None:
+    for suffix in ("MODEL", "OPENAI_BASE_URL", "OPENAI_IS_PAID", "OPENAI_IS_LOCAL", "PRICE_INPUT_PER_MTOK"):
+        monkeypatch.delenv(f"FLOWPILOT_{suffix}", raising=False)
+    monkeypatch.delenv("FLOWPILOT_PRICE_OUTPUT_PER_MTOK", raising=False)
+    monkeypatch.setenv("FLOWPILOT_API_TOKEN", TOKEN)
+
+    monkeypatch.setenv("FLOWPILOT_PROVIDER", "anthropic")
+    assert load_settings().provider == "anthropic"  # default model has a published price
+    monkeypatch.setenv("FLOWPILOT_MODEL", "claude-unknown-9")
+    with pytest.raises(ConfigError, match="No price"):
+        load_settings()
+
+    monkeypatch.setenv("FLOWPILOT_PROVIDER", "openai-compatible")
+    monkeypatch.setenv("FLOWPILOT_MODEL", "some-model")
+    monkeypatch.setenv("FLOWPILOT_OPENAI_BASE_URL", "http://127.0.0.1:8080/v1")
+    assert load_settings().openai_is_local is True
+    monkeypatch.setenv("FLOWPILOT_OPENAI_BASE_URL", "https://api.example.com/v1")
+    with pytest.raises(ConfigError, match="No price"):  # remote endpoint = paid unless declared local
+        load_settings()
+    monkeypatch.setenv("FLOWPILOT_PRICE_INPUT_PER_MTOK", "1")
+    monkeypatch.setenv("FLOWPILOT_PRICE_OUTPUT_PER_MTOK", "2")
+    assert load_settings().openai_is_local is False

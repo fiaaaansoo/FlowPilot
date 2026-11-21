@@ -72,3 +72,29 @@ describe('resolveRef / performByRef', () => {
     expect(performByRef(step, `snap-${seq}`, ref, { confirmed: true }).ok).toBe(true);
   });
 });
+
+describe('review regressions', () => {
+  it('never sends prefilled textarea content, option texts or scripts through an element text', () => {
+    document.body.innerHTML = `
+      <form aria-label="Note">
+        <textarea name="note">brouillon confidentiel</textarea>
+        <select name="choix"><option>option secrète</option></select>
+        <script>var token = "abc123";</script>
+        <button type="submit">Envoyer la note</button>
+      </form>`;
+    const serialized = JSON.stringify(observePage(document, ids));
+    expect(serialized).not.toMatch(/brouillon confidentiel|option secrète|abc123/);
+  });
+
+  it('Enter in a field of a destructive form still needs a human', () => {
+    document.body.innerHTML = `
+      <form aria-label="Compte"><input name="motif" aria-label="Motif" /><button type="submit">Supprimer mon compte</button></form>`;
+    const ref = observePage(document, ids).elements.find((e) => e.name === 'Motif')?.ref ?? '';
+    const step = { id: 's', kind: 'press' as const, key: 'Enter' as const, target: { tag: 'input', attributes: {}, css: 'x' } };
+    expect(performByRef(step, `snap-${seq}`, ref, { confirmed: false })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFIRMATION_REQUIRED' },
+    });
+  });
+});
+

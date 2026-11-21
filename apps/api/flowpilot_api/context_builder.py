@@ -122,7 +122,8 @@ def render_untrusted(request: RecoveryRequest, pack: ContextPack) -> str:
         "page": {"path": path, "title": request.page.title},
         "elements": [_compact(entry) for entry in pack.entries],
     }
-    return json.dumps(payload, ensure_ascii=False, indent=None)
+    # Escape "<" so page text cannot close the <untrusted_page_content> block (still valid JSON).
+    return json.dumps(payload, ensure_ascii=False, indent=None).replace("<", "\\u003c")
 
 
 def render_task(request: RecoveryRequest) -> str:

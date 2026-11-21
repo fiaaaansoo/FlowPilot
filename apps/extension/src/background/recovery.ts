@@ -6,6 +6,7 @@ import {
   kindAccepts,
   needsHuman,
   ok,
+  originOf,
   parseRecoveryResponse,
   sameBinding,
   type AiProposalPrompt,
@@ -223,6 +224,9 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
     // OBSERVE: a fresh snapshot for every attempt (the page may have changed).
     const observation = await env.observe(ctx.tabId);
     if (!observation.ok) return escalate('escalated', ctx.failure, observation.error.message);
+    if (originOf(observation.value.url) !== ctx.origin) {
+      return escalate('escalated', ctx.failure, 'la page n’est pas sur le site de la procédure');
+    }
 
     const request: RecoveryRequest = {
       contract: RECOVERY_CONTRACT,
