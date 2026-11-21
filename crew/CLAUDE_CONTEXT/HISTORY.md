@@ -21,5 +21,5 @@ Décisions clés (détail : docs/architecture.md) :
 - Build : le plugin `flowpilot-content-script` lance le build IIFE du content script après chaque build principal (watch compris). E2e = copie du dist/ distribué + host_permissions localhost sur la copie seulement.
 - TypeScript 6.0 (typescript-eslint 8 ne supporte pas TS 7). Chrome injecte `body { font-size: 75% }` dans les pages d'extension → typo déclarée sur `body`.
 Revue : requesting-code-review (0 critique, 6 importants corrigés : arrêt avant étape, `complete` d'un chargement antérieur + vérif origine du pong, script orphelin, watch qui effaçait content.js, permission rejetée silencieuse, live region bavarde) puis simplify (gardes partagées, failedRun, stores réutilisés par le panneau, build/e2e simplifiés).
-Key files/commits: 864586a (scaffold crew), e864439 (Sprint 1). Limites connues : docs/architecture.md § Limites.
+Key files/commits: b27fec5 (scaffold crew), d325456 (Sprint 1). Limites connues : docs/architecture.md § Limites.
 Tests: checklists crew/TESTS/IA/sprint-1-extension-scaffold.md (filtre d'origine des messages, rechargement d'extension, arrêt pendant navigation) et crew/TESTS/DEV/sprint-1-extension-scaffold.md (Side Panel natif, dialogue de permission, persistance après redémarrage). Couvert par ailleurs : 115 tests Vitest + 6 e2e Playwright.
