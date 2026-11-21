@@ -82,3 +82,20 @@ Tasks are listed in priority order. Complexity: S < 1 day, M 1–3 days, L > 3 d
 - [ ] **P9 · Experimental write-up (S).** Method, threats to validity, results, and limitations in `docs/benchmarks/sprint-4.md`, plus a short demo recording of the side panel flow.
   - Depends on: P4–P8.
   - Accept when every figure in the write-up is reproducible from a committed manifest and raw data.
+
+## Status (paused 2026-11-21, resume here)
+
+Implemented and committed on `feat/sprint-4-evaluation` (up to `b248f34`), including the independent review fixes:
+- framework, dataset 1.1.0 (47 scenarios), runner, report, dashboard, figures (P1, P2, P3, P8 tooling);
+- adaptive settle 3 s, cross-origin gate, semantic long-label fix, evaluation knobs, prompt v2.
+
+Final campaign `s4-final` (code `b248f34`, settle 3000 ms), done so far: `deterministic`, `semantic`, `llm:qwen2.5:3b` x3 (all categories).
+Still to run, one batch per command (`FLOWPILOT_EVAL_RUN=s4-final npx playwright test -c playwright.benchmark.config.ts`):
+1. `FLOWPILOT_EVAL_CONFIGS=llm-memory:qwen2.5:3b`
+2. `llm:qwen2.5:7b`, then `llm:llama3.2:3b`, then `llm:qwen2.5:3b#v2`
+3. `llm:qwen2.5:3b@minimal,llm:qwen2.5:3b@extended,llm:qwen2.5:3b@unranked` with `FLOWPILOT_EVAL_SCENARIOS=semantic,security,ambiguous`
+4. Context rot, run `s4f-rot`: the 4 context configs on the 10 rot scenarios with `FLOWPILOT_EVAL_DISTRACTORS=0,50,150,300` (two batches of 5 scenarios)
+5. Settle study: rebuild with `VITE_FLOWPILOT_SETTLE_MS=0` and `=1500`, run `deterministic,llm:qwen2.5:3b` on `dynamic,semantic` (runs `s4f-settle0`, `s4f-settle1500`), then rebuild the default
+Then: `npm run eval:report`, `npm run eval:figures` into `docs/research/`, research report `docs/research/sprint-4-report.md`, `docs/benchmarks/sprint-4.md`, full checks, push, PR to `feat/sprint-3-agentic-recovery`, CI.
+Earlier runs `s4`, `s4-rot`, `s4-settle*` predate the review fixes: preliminary, not for the report.
+
