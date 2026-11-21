@@ -10,7 +10,12 @@ import {
   workflowFromDraft,
   type Command,
   type CommandResponse,
+  RECOVERY_CONTRACT,
+  type AiProposalPrompt,
+  type AiSettings,
   type ContentPong,
+  type FlowPilotError,
+  type Observation,
   type ElementStep,
   type PageEvent,
   type RecordedEvent,
@@ -21,7 +26,8 @@ import {
   type SessionStatus,
   type Workflow,
 } from '@flowpilot/shared';
-import { runWorkflow } from '../executor/executor';
+import { runWorkflow, type StepRecovery } from '../executor/executor';
+import { RunRecoveryBudget, createBackendClient, recoverStep, type BackendClient } from './recovery';
 import { appendEvents, createDraft, defaultWorkflowName } from '../recorder/recorder';
 import type { RunStore } from '../storage/run-store';
 import type { SessionStore } from '../storage/session-store';
@@ -49,6 +55,19 @@ export interface BrowserEnv {
   /** Exécute une étape sur un élément de la page (grounding + action + vérification). */
   perform(tabId: number, step: ElementStep, signal: AbortSignal, confirmed: boolean): Promise<Result<{ strategy: string }>>;
   setIndicator(status: SessionStatus): Promise<void>;
+  /** AI recovery: bounded, sanitized snapshot of the page's interactive elements. */
+  observe(tabId: number): Promise<Result<Observation>>;
+  /** AI recovery: runs the recorded step on an element of the latest snapshot (revalidated in the page). */
+  performRef(
+    tabId: number,
+    step: ElementStep,
+    snapshotId: string,
+    ref: string,
+    confirmed: boolean,
+    signal: AbortSignal,
+  ): Promise<Result<{ strategy: string }>>;
+  /** AI recovery settings saved by the side panel (disabled by default). */
+  loadAiSettings(): Promise<AiSettings>;
 }
 
 export interface ControllerDeps {
@@ -58,6 +77,8 @@ export interface ControllerDeps {
   runs: RunStore;
   now: () => number;
   newId: () => string;
+  /** Backend client factory (injected in tests). */
+  createBackend?: (settings: AiSettings) => BackendClient;
 }
 
 interface ActiveRun {
@@ -66,6 +87,8 @@ interface ActiveRun {
   done: Promise<void>;
   /** Intervention humaine attendue sur une étape. */
   human?: { stepIndex: number; resolve: (proceed: boolean) => void } | undefined;
+  /** Backend used by this run's recoveries, for outcome reports. */
+  backend?: BackendClient | undefined;
 }
 
 /**
@@ -292,6 +315,8 @@ export class SessionController {
     const { env } = this.deps;
     const run: ActiveRun = { tabId, abort: new AbortController(), done: Promise.resolve() };
     this.activeRun = run;
+    const runId = this.deps.newId();
+    const budget = new RunRecoveryBudget();
 
     // runWorkflow ne rejette pas (toute exception devient un échec d'étape) ;
     // le catch final ne protège que l'écriture du résultat.
@@ -302,6 +327,10 @@ export class SessionController {
         waitForNavigation: (url, signal) => env.waitForNavigation(tabId, url, signal),
         perform: (step, signal, confirmed) => env.perform(tabId, step, signal, confirmed),
         requestHuman: (stepIndex, signal) => this.requestHuman(run, stepIndex, signal),
+        recover: (stepIndex, step, failure, signal) => this.aiRecover(run, { runId, workflow, budget }, stepIndex, step, failure, signal),
+        reportOutcome: (recoveryId, verified, detail) => {
+          void run.backend?.reportOutcome(recoveryId, { contract: RECOVERY_CONTRACT, verified, detail });
+        },
       },
       {
         signal: run.abort.signal,
@@ -315,8 +344,51 @@ export class SessionController {
       });
   }
 
+  /**
+   * AI recovery for a step whose deterministic grounding failed. Returns `null`
+   * when AI recovery is disabled: the run then fails exactly as in Sprint 2.
+   */
+  private async aiRecover(
+    run: ActiveRun,
+    scope: { runId: string; workflow: Workflow; budget: RunRecoveryBudget },
+    stepIndex: number,
+    step: ElementStep,
+    failure: FlowPilotError,
+    signal: AbortSignal,
+  ): Promise<StepRecovery | null> {
+    const { env, now } = this.deps;
+    const settings = await env.loadAiSettings();
+    if (!settings.enabled) return null;
+    const backend = (this.deps.createBackend ?? createBackendClient)(settings);
+    run.backend = backend;
+    const result = await recoverStep(
+      {
+        observe: (tabId) => env.observe(tabId),
+        performRef: (tabId, s, snapshotId, ref, confirmed, sig) => env.performRef(tabId, s, snapshotId, ref, confirmed, sig),
+      },
+      backend,
+      {
+        runId: scope.runId,
+        workflowId: scope.workflow.id,
+        origin: scope.workflow.origin,
+        tabId: run.tabId,
+        stepIndex,
+        step,
+        failure,
+        signal,
+        mode: settings.mode,
+        budget: scope.budget,
+        requestHuman: (prompt) => this.requestHuman(run, stepIndex, signal, prompt),
+        now,
+      },
+    );
+    return result.ok
+      ? { ok: true, strategy: result.strategy, log: result.log, recoveryId: result.pending.recoveryId }
+      : { ok: false, error: result.error, log: result.log };
+  }
+
   /** Suspend le run jusqu'à `replay/continue` (ou l'arrêt) ; la session signale l'attente au Side Panel. */
-  private requestHuman(run: ActiveRun, stepIndex: number, signal: AbortSignal): Promise<boolean> {
+  private requestHuman(run: ActiveRun, stepIndex: number, signal: AbortSignal, prompt?: AiProposalPrompt): Promise<boolean> {
     return new Promise((resolve) => {
       if (signal.aborted) {
         resolve(false);
@@ -330,7 +402,7 @@ export class SessionController {
       const onAbort = () => settle(false);
       signal.addEventListener('abort', onAbort, { once: true });
       run.human = { stepIndex, resolve: settle };
-      void this.updateRun(run, { type: 'HUMAN_REQUESTED', stepIndex });
+      void this.updateRun(run, { type: 'HUMAN_REQUESTED', stepIndex, ...(prompt ? { prompt } : {}) });
     });
   }
 

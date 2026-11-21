@@ -15,3 +15,9 @@ export const LOCAL_KEYS = {
   workflows: 'flowpilot.workflows',
   runs: 'flowpilot.runs',
 } as const;
+
+/**
+ * AI recovery settings (backend URL, token, autonomy mode). Written by the side
+ * panel (configuration, not session state), read by the service worker.
+ */
+export const AI_SETTINGS_KEY = 'flowpilot.ai';

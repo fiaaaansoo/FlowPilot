@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Command, CommandResponse, Workflow } from '@flowpilot/shared';
+import type { AiSettings, Command, CommandResponse, Workflow } from '@flowpilot/shared';
 import { App } from './App';
 import { EMPTY_SNAPSHOT, type ExtensionApi, type PanelSnapshot } from './api';
 
@@ -21,6 +21,7 @@ function fakeApi(initial: Partial<PanelSnapshot> = {}, reply?: (command: Command
     Promise.resolve<CommandResponse>(reply?.(command) ?? { ok: true, value: snapshot.session }),
   );
   const requestOrigin = vi.fn(() => Promise.resolve(true));
+  const saveAiSettings = vi.fn((_settings: AiSettings) => Promise.resolve());
   const api: ExtensionApi = {
     snapshot: () => Promise.resolve(snapshot),
     subscribe: (fn) => {
@@ -30,6 +31,15 @@ function fakeApi(initial: Partial<PanelSnapshot> = {}, reply?: (command: Command
     send,
     requestOrigin,
     removeOrigin: () => Promise.resolve(true),
+    saveAiSettings,
+    backendStatus: () =>
+      Promise.resolve({ ok: true as const, value: { provider: 'ollama', model: 'qwen2.5:3b', local: true, llmEnabled: true } }),
+    listMemory: () =>
+      Promise.resolve({
+        ok: true as const,
+        value: [{ id: 1, original: '« Rechercher »', corrected: '« Trouver des offres »', uses: 2, strategy: 'llm' }],
+      }),
+    forgetMemory: () => Promise.resolve({ ok: true as const, value: undefined }),
   };
   const set = (next: Partial<PanelSnapshot>) => {
     snapshot = { ...snapshot, ...next };
@@ -37,7 +47,7 @@ function fakeApi(initial: Partial<PanelSnapshot> = {}, reply?: (command: Command
       fn();
     });
   };
-  return { api, send, requestOrigin, set };
+  return { api, send, requestOrigin, saveAiSettings, set };
 }
 
 const button = (name: string) => screen.getByRole('button', { name });
@@ -202,5 +212,69 @@ describe('Side Panel', () => {
     const fake = fakeApi({ session: { status: 'replaying', tabId: 1, workflowId: 'wf-1', startedAt: 1, stepIndex: 0 } });
     render(<App api={fake.api} keepAliveMs={20} />);
     await waitFor(() => expect(fake.send).toHaveBeenCalledWith({ type: 'session/get' }));
+  });
+
+  it('AI recovery is off by default and can be enabled with a loopback service and a token', async () => {
+    const fake = fakeApi();
+    render(<App api={fake.api} />);
+    const toggle = await screen.findByLabelText('Activer la récupération IA');
+    expect(toggle).not.toBeChecked();
+    await userEvent.click(toggle);
+    await userEvent.type(screen.getByLabelText('Jeton d’accès'), 'x'.repeat(32));
+    await userEvent.click(button('Enregistrer les réglages'));
+    expect(fake.requestOrigin).toHaveBeenCalledWith('http://127.0.0.1/*');
+    await waitFor(() =>
+      expect(fake.saveAiSettings).toHaveBeenCalledWith({
+        enabled: true,
+        endpoint: 'http://127.0.0.1:8787',
+        token: 'x'.repeat(32),
+        mode: 'auto-when-safe',
+      }),
+    );
+    await userEvent.click(button('Tester la connexion'));
+    expect(await screen.findByText(/Connecté : ollama \(qwen2.5:3b\), local, sans frais d’API/)).toBeInTheDocument();
+  });
+
+  it('refuses a remote AI service address', async () => {
+    const fake = fakeApi();
+    render(<App api={fake.api} />);
+    const endpoint = await screen.findByLabelText('Adresse du service local');
+    await userEvent.clear(endpoint);
+    await userEvent.type(endpoint, 'https://api.example.com');
+    await userEvent.click(button('Enregistrer les réglages'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('seul un service local');
+    expect(fake.saveAiSettings).not.toHaveBeenCalled();
+  });
+
+  it('lists memorized corrections', async () => {
+    render(<App api={fakeApi().api} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Corrections mémorisées' }));
+    expect(await screen.findByText(/« Rechercher » → « Trouver des offres » \(2 réutilisations\)/)).toBeInTheDocument();
+  });
+
+  it('shows an AI proposal with its strategy and confidence before execution', async () => {
+    const flow = {
+      ...workflow,
+      steps: [
+        workflow.steps[0] as Workflow['steps'][number],
+        { id: 's2', kind: 'click' as const, target: { tag: 'button', name: 'Rechercher', attributes: {}, css: 'button' } },
+      ],
+    };
+    const fake = fakeApi({
+      session: {
+        status: 'replaying',
+        tabId: 1,
+        workflowId: 'wf-1',
+        startedAt: 1,
+        stepIndex: 1,
+        awaitingHuman: true,
+        humanPrompt: { kind: 'ai-proposal', proposed: '« Trouver des offres » (button)', strategy: 'llm', confidence: 0.62, rationale: 'synonyme' },
+      },
+      workflows: { workflows: [flow], invalidCount: 0 },
+    });
+    render(<App api={fake.api} />);
+    const dialog = await screen.findByRole('alertdialog', { name: 'Proposition de l’IA à confirmer' });
+    expect(dialog).toHaveTextContent('FlowPilot propose « Trouver des offres » (button) (modèle de langage, confiance 62 %)');
+    expect(dialog).toHaveTextContent('Justification du modèle, non vérifiée : synonyme');
   });
 });

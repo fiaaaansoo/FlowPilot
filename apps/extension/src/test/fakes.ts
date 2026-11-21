@@ -1,5 +1,8 @@
 import {
+  DEFAULT_AI_SETTINGS,
   PROTOCOL_VERSION,
+  type AiSettings,
+  type Observation,
   ok,
   originPatternFor,
   type ContentPong,
@@ -96,6 +99,26 @@ export class FakeEnv implements BrowserEnv {
   perform(_tabId: number, step: ElementStep, signal: AbortSignal) {
     this.calls.push({ op: 'perform', step });
     return this.performImpl(step, signal);
+  }
+
+  /** AI recovery settings returned to the controller (disabled by default, like the real extension). */
+  aiSettings: AiSettings = DEFAULT_AI_SETTINGS;
+  observation: Observation = { snapshotId: 'snap-1', url: 'http://localhost:5173/', title: 'Démo', elements: [] };
+  performRefImpl: (ref: string, confirmed: boolean) => Promise<Result<{ strategy: string }>> = () =>
+    Promise.resolve(ok({ strategy: 'ai' }));
+  refCalls: { ref: string; confirmed: boolean }[] = [];
+
+  observe(): Promise<Result<Observation>> {
+    return Promise.resolve(ok(this.observation));
+  }
+
+  performRef(_tabId: number, _step: ElementStep, _snapshotId: string, ref: string, confirmed: boolean) {
+    this.refCalls.push({ ref, confirmed });
+    return this.performRefImpl(ref, confirmed);
+  }
+
+  loadAiSettings() {
+    return Promise.resolve(this.aiSettings);
   }
 
   setIndicator(status: SessionStatus) {

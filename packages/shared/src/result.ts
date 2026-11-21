@@ -24,6 +24,8 @@ export const ERROR_CODES = [
   'VERIFICATION_FAILED',
   /** La page juge l'élément résolu irréversible alors que l'étape n'a pas été confirmée. */
   'CONFIRMATION_REQUIRED',
+  /** AI recovery is disabled, not configured, or the backend is unreachable or returned invalid data. */
+  'RECOVERY_UNAVAILABLE',
   'UNKNOWN_COMMAND',
   'INTERNAL',
 ] as const;

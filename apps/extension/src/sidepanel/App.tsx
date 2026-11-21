@@ -16,6 +16,7 @@ import { HumanPrompt } from './components/HumanPrompt';
 import { StepList } from './components/StepList';
 import { WorkflowList } from './components/WorkflowList';
 import { AllowedSites } from './components/AllowedSites';
+import { AiRecovery } from './components/AiRecovery';
 
 interface Props {
   api: ExtensionApi;
@@ -25,7 +26,7 @@ interface Props {
 
 export function App({ api, keepAliveMs = 20_000 }: Props) {
   const { snapshot, loaded, loadError, refresh } = usePanelState(api);
-  const { session, workflows, runs, draft, allowedOrigins } = snapshot;
+  const { session, workflows, runs, draft, allowedOrigins, ai } = snapshot;
   const [error, setError] = useState<FlowPilotError | null>(null);
   const [busy, setBusy] = useState(false);
   const [pickedId, setPickedId] = useState<string | null>(null);
@@ -99,6 +100,7 @@ export function App({ api, keepAliveMs = 20_000 }: Props) {
       {humanStep && session.status === 'replaying' && (
         <HumanPrompt
           step={humanStep}
+          proposal={session.humanPrompt}
           busy={busy}
           onContinue={() => void run({ type: 'replay/continue', stepIndex: session.stepIndex })}
           onStop={stop}
@@ -143,6 +145,13 @@ export function App({ api, keepAliveMs = 20_000 }: Props) {
       />
 
       <AllowedSites origins={allowedOrigins} onAllow={allow} onRevoke={revoke} />
+
+      <AiRecovery
+        key={`${ai.enabled}|${ai.endpoint}|${ai.mode}|${ai.token.length}`}
+        api={api}
+        settings={ai}
+        onError={(message) => setError({ code: 'RECOVERY_UNAVAILABLE', message })}
+      />
     </main>
   );
 }

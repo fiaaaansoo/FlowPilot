@@ -2,6 +2,7 @@ import { isFiniteNumber, isNonEmptyString, isRecord } from './guards.js';
 import { isErrorCode, type Result } from './result.js';
 import { parseRecordedEvent, type PageEvent, type RecordedEvent } from './recording.js';
 import type { SessionState } from './session.js';
+import type { Candidate, Observation } from './recovery.js';
 import type { ElementStep } from './workflow.js';
 
 /**
@@ -41,7 +42,11 @@ export type ContentRequest =
    */
   | { type: 'content/perform'; step: ElementStep; timeoutMs: number; confirmed: boolean }
   /** Annule l'action en cours (arrêt du replay pendant l'attente d'un élément). */
-  | { type: 'content/cancel' };
+  | { type: 'content/cancel' }
+  /** AI recovery: bounded, sanitized snapshot of the visible interactive elements. */
+  | { type: 'content/observe' }
+  /** AI recovery: run the recorded step on an element of the latest snapshot, revalidated first. */
+  | { type: 'content/perform-ref'; step: ElementStep; snapshotId: string; ref: string; confirmed: boolean };
 
 export interface ContentPong {
   type: 'content/pong';
@@ -101,7 +106,16 @@ export function isContentRequest(value: unknown): value is ContentRequest {
     case 'content/perform':
       return isRecord(value.step) && isFiniteNumber(value.timeoutMs) && typeof value.confirmed === 'boolean';
     case 'content/cancel':
+    case 'content/observe':
       return true;
+    case 'content/perform-ref':
+      return (
+        isRecord(value.step) &&
+        isNonEmptyString(value.snapshotId) &&
+        typeof value.ref === 'string' &&
+        /^e\d{1,5}$/.test(value.ref) &&
+        typeof value.confirmed === 'boolean'
+      );
     default:
       return false;
   }
@@ -134,6 +148,20 @@ export function parseRecordAck(value: unknown): RecordedEvent[] | null {
     if (event.ok) events.push(event.value);
   }
   return events;
+}
+
+/** Validates the observation returned by the content script (bounded, well-formed candidates only). */
+export function parseObservation(value: unknown): Observation | null {
+  if (!isRecord(value) || !isNonEmptyString(value.snapshotId) || typeof value.url !== 'string' || !Array.isArray(value.elements)) {
+    return null;
+  }
+  const elements: Candidate[] = [];
+  for (const raw of (value.elements as unknown[]).slice(0, 300)) {
+    if (!isRecord(raw) || typeof raw.ref !== 'string' || !/^e\d{1,5}$/.test(raw.ref) || !isNonEmptyString(raw.tag)) return null;
+    if (!isRecord(raw.attributes)) return null;
+    elements.push(raw as unknown as Candidate);
+  }
+  return { snapshotId: value.snapshotId, url: value.url, title: typeof value.title === 'string' ? value.title.slice(0, 200) : '', elements };
 }
 
 export function parsePerformResponse(value: unknown): PerformResponse | null {
