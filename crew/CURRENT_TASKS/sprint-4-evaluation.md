@@ -87,4 +87,12 @@ Tasks are listed in priority order. Complexity: S < 1 day, M 1–3 days, L > 3 d
 
 All actions done on `feat/sprint-4-evaluation` (up to `49ccd18`); final runs `s4-final`, `s4f-rot`, `s4f-settle*`; report `docs/research/sprint-4-report.md`.
 Done differently from the plan: P2 has 47 scenarios on 7 workflows of the demo site (2 held out), not several page types beyond it; P4 compared 3 local models (no OpenAI-compatible runtime run); P9 has no demo recording.
-Before closure: owner review of the PR, then `/crew-close-task` (deep size: the independent review is done, the `simplify` pass is not).
+Before closure: owner review and merge of PRs #1 → #2 → #3, then `/crew-close-task`.
+
+## Phase A stabilization (2026-11-21)
+
+- `simplify` pass done (reuse, simplification, efficiency, altitude): duplicated metric checks removed, report correct-proposal rate aligned with `proposalMatches`; regenerated `s4-final` and `s4f-rot` reports are unchanged.
+- Security review of Sprints 2–4: no critical or high finding. Fixed with regression tests: fields of a cross-origin form offered to the model again (Sprint 4 regression); text of sensitive-marked subtrees and link query values sent to the model; AI prompt not saying why confirmation is needed; `resolveRef` identity check too weak (row, section, destination); hidden loading indicator holding the wait; provider base-URL credentials in error messages.
+- Deferred (low, documented in the integration report): unverified correction memorized when the recovered step is the last one; no server-side spending ceiling; token readable by content scripts; confirmation matched by step index only.
+- Sprint 1–2 AI checklist items automated in `tests/e2e/hardening.spec.ts`; the extension-reload item is manual (`crew/TESTS/DEV/sprint-1-extension-scaffold.md`).
+- Still open from the plan: P4 OpenAI-compatible runtime run, P9 demo recording, native Chrome checks.

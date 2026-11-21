@@ -1,8 +1,9 @@
-# Sprint 1 — tests DEV
+# Sprint 1 — DEV tests
 
-À faire dans un vrai Chrome (les e2e ouvrent le Side Panel comme un onglet et contournent la boîte de dialogue de permission).
+To run in a real Chrome (the e2e tests open the side panel as a tab and bypass the permission prompt). UI labels are quoted as shown in the (French) interface.
 
-- [ ] 🖱️ `npm run build`, charger `apps/extension/dist` dans `chrome://extensions` : clic sur l'icône → le Side Panel natif s'ouvre, police Atkinson appliquée, mode sombre suivant le système.
-- [ ] 🖱️ Sites autorisés : saisir `localhost:5173` → Chrome affiche sa demande d'accès ; accepter → le site apparaît ; refuser → message « Accès à … non accordé », saisie conservée.
-- [ ] 🖱️ Avec `npm run dev:demo` : Enregistrer sur une page de résultats → badge `REC` et voyant orange ; Arrêter → workflow listé ; naviguer ailleurs puis Rejouer → retour à la page enregistrée et « Dernière lecture réussie ».
-- [ ] 🖱️ Fermer puis rouvrir le navigateur → le workflow est toujours listé (critère « conservé après fermeture »).
+- [ ] 🖱️ `npm run build`, load `apps/extension/dist` in `chrome://extensions`: clicking the toolbar icon opens the native side panel, the Atkinson font is applied, dark mode follows the system.
+- [ ] 🖱️ Allowed sites: enter `localhost:5173` → Chrome shows its access prompt; accept → the site is listed; decline → message « Accès à … non accordé », the input is kept.
+- [ ] 🖱️ With `npm run dev:demo`: « Enregistrer » on a results page → `REC` badge and orange lamp; « Arrêter » → workflow listed; navigate elsewhere, then « Rejouer » → back to the recorded page and « Dernière lecture réussie ».
+- [ ] 🖱️ Close and reopen the browser → the workflow is still listed (acceptance criterion "kept after closing").
+- [ ] 🖱️ Extension reload with an already recorded tab: record on a tab, reload the extension from `chrome://extensions`, then « Enregistrer » on the same tab without reloading it → recording works (the orphaned content script is replaced; `connectContent` pings first). Not automatable: Playwright's Chromium blocks an extension loaded with `--load-extension` after `chrome.runtime.reload()`.
