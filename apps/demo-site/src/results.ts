@@ -1,4 +1,4 @@
-import { applyVariant } from './variants';
+import { applyMutations } from './mutations';
 import { queryFromParams, searchJobs, type Job } from './jobs';
 
 const params = new URLSearchParams(location.search);
@@ -66,4 +66,4 @@ function renderJob(job: Job): HTMLLIElement {
 }
 
 // Controlled interface variation (tests and benchmarks only; none by default).
-applyVariant();
+applyMutations();

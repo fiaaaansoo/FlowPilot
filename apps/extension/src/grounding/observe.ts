@@ -1,6 +1,6 @@
 import { LIMITS, MAX_OBSERVATION_ELEMENTS, fail, ok, sanitizeUrl, type Candidate, type Observation, type Result } from '@flowpilot/shared';
 import { isIrreversibleAction, isSensitiveField, submissionScope } from '../recorder/classify';
-import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, stableAttributes, textOf } from './dom';
+import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, sameOrigin, stableAttributes, textOf } from './dom';
 
 /**
  * Page observation for AI recovery (content script).
@@ -47,25 +47,6 @@ function sectionLabel(el: Element): string | undefined {
 
 const CONTRACT_TAG = /^[a-z][a-z0-9-]{0,31}$/;
 
-/** Where activating the element sends the user or the form data: a link target, a form action, a formaction. */
-function destination(el: Element): string | null {
-  if (el instanceof HTMLAnchorElement || el instanceof HTMLAreaElement) return el.getAttribute('href');
-  if (el instanceof HTMLFormElement) return el.getAttribute('action');
-  if ((el instanceof HTMLButtonElement || el instanceof HTMLInputElement) && el.form) {
-    return el.getAttribute('formaction') ?? el.form.getAttribute('action');
-  }
-  return null;
-}
-
-function sameOrigin(el: Element): boolean {
-  const target = destination(el);
-  if (!target) return true;
-  try {
-    return new URL(target, el.ownerDocument.baseURI).origin === el.ownerDocument.defaultView?.location.origin;
-  } catch {
-    return false;
-  }
-}
 
 /** Observed identity of an element: what must still hold when a proposal is executed. */
 export function describeCandidate(el: Element, ref: string): Candidate {

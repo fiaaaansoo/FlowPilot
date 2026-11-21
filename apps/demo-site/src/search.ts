@@ -1,4 +1,4 @@
-import { applyVariant } from './variants';
+import { applyMutations } from './mutations';
 import { queryFromParams } from './jobs';
 
 // « Modifier la recherche » revient ici avec les critères dans l'URL : on pré-remplit le formulaire.
@@ -17,4 +17,4 @@ const remote = form.querySelector<HTMLInputElement>('input[name="teletravail"]')
 if (remote) remote.checked = query.remoteOnly;
 
 // Controlled interface variation (tests and benchmarks only; none by default).
-applyVariant();
+applyMutations();

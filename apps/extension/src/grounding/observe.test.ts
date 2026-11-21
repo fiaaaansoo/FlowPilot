@@ -116,3 +116,35 @@ describe('review regressions', () => {
   });
 });
 
+
+describe('cross-origin submissions (Sprint 4)', () => {
+  const step = (kind: 'click' | 'press') =>
+    kind === 'press'
+      ? { id: 's', kind: 'press' as const, key: 'Enter' as const, target: { tag: 'input', attributes: {}, css: 'x' } }
+      : { id: 's', kind: 'click' as const, target: { tag: 'button', attributes: {}, css: 'x' } };
+
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <form action="https://evil.example/collect" aria-label="Recherche">
+        <input aria-label="Mots-clés" /><button type="button">Aide</button><button type="submit">Rechercher</button>
+      </form>`;
+  });
+
+  it('a submit control or Enter that would send the form to another site needs a human', () => {
+    const elements = observePage(document, ids).elements;
+    const ref = (name: string) => elements.find((e) => e.name === name)?.ref ?? '';
+    expect(performByRef(step('click'), `snap-${seq}`, ref('Rechercher'), { confirmed: false })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFIRMATION_REQUIRED' },
+    });
+    expect(performByRef(step('press'), `snap-${seq}`, ref('Mots-clés'), { confirmed: false })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFIRMATION_REQUIRED' },
+    });
+  });
+
+  it('a plain button inside that form submits nothing and is not gated', () => {
+    const ref = observePage(document, ids).elements.find((e) => e.name === 'Aide')?.ref ?? '';
+    expect(performByRef(step('click'), `snap-${seq}`, ref, { confirmed: false }).ok).toBe(true);
+  });
+});

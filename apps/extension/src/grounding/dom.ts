@@ -293,3 +293,38 @@ export function describeElement(el: Element): ElementTarget {
     css: uniqueSelector(el),
   };
 }
+
+/** Where activating the element sends the user or the form data: a link target, a form action, a formaction. */
+export function destination(el: Element): string | null {
+  if (el instanceof HTMLAnchorElement || el instanceof HTMLAreaElement) return el.getAttribute('href');
+  if (el instanceof HTMLFormElement) return el.getAttribute('action');
+  if (isSubmitter(el) && el.form) return el.getAttribute('formaction') ?? el.form.getAttribute('action');
+  return null;
+}
+
+/** A control that submits its form when activated (not `type="button"` or `"reset"`). */
+function isSubmitter(el: Element): el is HTMLButtonElement | HTMLInputElement {
+  return (el instanceof HTMLButtonElement && el.type === 'submit') || (el instanceof HTMLInputElement && (el.type === 'submit' || el.type === 'image'));
+}
+
+/** Does activating the element keep the user and the form data on the page's origin? */
+export function sameOrigin(el: Element): boolean {
+  const target = destination(el);
+  if (!target) return true;
+  try {
+    return new URL(target, el.ownerDocument.baseURI).origin === el.ownerDocument.defaultView?.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Would activating this element send form data to another origin? True for a form, or for a
+ * submit control of a form, whose action (or formaction) leaves the page's origin. For Enter in
+ * a field, pass the field's form (see `submissionScope`).
+ */
+export function submitsCrossOrigin(el: Element): boolean {
+  if (el instanceof HTMLFormElement) return !sameOrigin(el);
+  return isSubmitter(el) && el.form !== null && !sameOrigin(el);
+}
+
