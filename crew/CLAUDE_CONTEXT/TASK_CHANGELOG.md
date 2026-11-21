@@ -20,3 +20,5 @@
 - 2026-11-21 🧹 **lock of a task closed outside the main checkout purged**: `sprint-3-agent-recovery.md`
 - 2026-11-21 ▶️ **started**: `sprint-3-validation.md`
 - 2026-11-21 🧪 **tests validated**: `sprint-3-agent-recovery.md` (moved to `TESTS_DONE/`)
+- 2026-11-21 ▶️ **started**: `sprint-4-evaluation.md`
+- 2026-11-21 ⏸️ **paused**: `sprint-3-validation.md`
