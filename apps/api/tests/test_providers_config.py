@@ -87,11 +87,14 @@ def test_provider_errors_never_echo_url_credentials() -> None:
         raise httpx.ConnectError("refused")
 
     provider = OllamaProvider(
-        base_url="http://user:s3cr3t@ollama:11434", model="qwen2.5:3b", transport=httpx.MockTransport(refuse)
+        base_url="http://user:s3cr3t@ollama:11434/?api_key=k3y",
+        model="qwen2.5:3b",
+        transport=httpx.MockTransport(refuse),
     )
     with pytest.raises(ProviderError) as error:
         provider.complete(system="s", messages=MESSAGES, schema=ACTION_SCHEMA, timeout_s=5)
     assert "s3cr3t" not in str(error.value)
+    assert "k3y" not in str(error.value)
     assert "ollama:11434" in str(error.value)
 
 
