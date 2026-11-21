@@ -50,7 +50,7 @@ python -m flowpilot_api serve                       # http://127.0.0.1:8787
 
 In the Side Panel, under **Récupération IA** (AI recovery), tick **Activer la récupération IA**, paste the token, click **Enregistrer les réglages** (Save settings), accept Chrome's prompt for `127.0.0.1`, then **Tester la connexion** (Test connection). The demo site has controlled interface changes for trying it: `http://localhost:5173/?variante=synonymes` (others: `classes`, `ids`, `hierarchie`, `libelles`, `bruit`, `liste`, `injection`; `?variante=aucune` restores the original).
 
-Without the service, or with **Activer la récupération IA** unticked (the default), FlowPilot records and replays exactly as before: deterministic, no network call. To compare the modes on the demo site, run the benchmark (`npm run bench`, see [docs/benchmarks](docs/benchmarks/README.md); on a busy machine run it in batches with `FLOWPILOT_BENCH_MODES`). Token usage, cost and recovery logs: each recovered step in the panel, `GET /v1/metrics` on the service, and the per-step `recovery` log in the run history ([docs/recovery.md](docs/recovery.md#inspecting-usage-and-recovery-logs)).
+Without the service, or with **Activer la récupération IA** unticked (the default), FlowPilot records and replays exactly as before: deterministic, no network call. To compare strategies and models on 47 interface-mutation scenarios, run the evaluation (`npm run eval`, then `npm run eval:report`; see [docs/benchmarks](docs/benchmarks/README.md); on a busy machine run one configuration per command). Latest results: [Sprint 4 research report](docs/research/sprint-4-report.md). Token usage, cost and recovery logs: each recovered step in the panel, `GET /v1/metrics` on the service, and the per-step `recovery` log in the run history ([docs/recovery.md](docs/recovery.md#inspecting-usage-and-recovery-logs)).
 
 Continuous extension development: `npm run dev:extension` rebuilds `dist/` (content script included) on every change. You then need to reload the extension in `chrome://extensions`.
 
@@ -62,7 +62,9 @@ Continuous extension development: `npm run dev:extension` rebuilds `dist/` (cont
 | `npm run typecheck` | `tsc` on the root and each workspace |
 | `npm test` | Vitest: shared logic, controller, executor, storage, Side Panel (jsdom), demo site |
 | `npm run test:e2e` | Extension build then Playwright: the shipped `dist/`, loaded in Chromium, + demo site + recovery backend (mock provider) |
-| `npm run bench` | Recovery benchmark on the shipped build ([docs/benchmarks](docs/benchmarks/README.md)) |
+| `npm run eval` | Evaluation runner on the shipped build, local models only ([docs/benchmarks](docs/benchmarks/README.md)) |
+| `npm run eval:report -- <run>` | Markdown report and offline dashboard from stored results |
+| `npm run eval:figures -- ...` | Research-report figures and `numbers.json` |
 | `cd apps/api && python -m pytest` | Backend tests (no model, no network) |
 | `npm run build` | Build of the extension and the demo site |
 | `npm run check` | lint + typecheck + tests + build (same as CI) |

@@ -195,7 +195,7 @@ tokens and time per recovered step.
   `observe.test.ts`, controller and side panel tests (Vitest).
 - End to end: `tests/e2e/recovery.spec.ts` and `tests/e2e/lifecycle.spec.ts` on the
   shipped build with the real backend and the mock provider.
-- Benchmark: `npm run bench`, see [benchmarks](benchmarks/README.md).
+- Evaluation: `npm run eval`, see [benchmarks](benchmarks/README.md) and the [Sprint 4 research report](research/sprint-4-report.md).
 
 ## Cancellation, late answers and the service worker lifecycle
 
@@ -251,6 +251,9 @@ buffered (`limits.py`).
 - Spend of a request the extension aborted is recorded by the backend but not charged
   to the extension's per-run budget.
 - The observation skips elements whose tag is outside the contract (`^[a-z][a-z0-9-]*$`).
-- About 10 s of every recovered step is the deterministic engine waiting for the
-  recorded element before it declares it missing.
+- A missing element is declared once the page has been settled for 3 s (no DOM change,
+  no loading indicator), at most 10 s. An element that appears after a longer silent
+  pause starts recovery too early (measured in Sprint 4; the proposal then needs the user).
+- Memory reuses a correction only when the element's name, identifiers, row context and
+  section all match (a twin in another form is never reused).
 

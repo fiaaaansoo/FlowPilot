@@ -178,7 +178,7 @@ machine), [ADR 0003](adr/0003-verified-memory-sqlite.md) (verified memory in SQL
 | Page content as data | `<untrusted_page_content>`, schema-forced output, gateway checks |
 | `RunStore` | `StepLog.recovery` telemetry; corrections stored by the backend |
 | Stable prompt prefix | Versioned prompt, `cache_control` on the system prompt with Anthropic |
-| Evaluation | Demo-site variants (`?variante=`), `tests/e2e/recovery.spec.ts`, `npm run bench` |
+| Evaluation | Mutation registry (`?m=`), versioned scenarios, `packages/evaluation`, `npm run eval` (Sprint 4, [ADR 0005](adr/0005-evaluation-framework.md)) |
 
 ## Known limitations
 

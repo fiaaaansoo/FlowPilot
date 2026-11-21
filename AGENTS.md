@@ -65,7 +65,8 @@ npx playwright install chromium # once, browser for the e2e tests
 npm run test:e2e                # extension build + Playwright (+ backend, mock provider), 22 tests
 npm run build                   # apps/extension/dist + apps/demo-site/dist
 npm run check                   # lint + typecheck + test + build (= CI job "check")
-npm run bench                   # recovery benchmark (FLOWPILOT_BENCH_OLLAMA_MODEL=qwen2.5:3b for the local model)
+npm run eval                    # evaluation runner (FLOWPILOT_EVAL_CONFIGS=..., see docs/benchmarks/README.md); local only
+npm run eval:report -- <run>    # report.md and dashboard.html from eval-results/<run>/results.jsonl
 
 cd apps/api                     # backend (Python 3.11+; verified with 3.14)
 python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev,anthropic]"
