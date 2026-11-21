@@ -198,6 +198,40 @@ describe('recoverStep', () => {
     expect(calls[0]?.confirmed).toBe(true);
   });
 
+  it('a response arriving after the run was stopped is never acted on', async () => {
+    const { recoveryEnv, calls } = env();
+    const controller = new AbortController();
+    const { client, outcomes } = backend(propose('e2'));
+    const late: BackendClient = {
+      propose: async (request, signal) => {
+        const response = await client.propose(request, signal);
+        controller.abort(); // the user stopped the replay while the backend was answering
+        return response;
+      },
+      reportOutcome: client.reportOutcome,
+    };
+    const result = await recoverStep(recoveryEnv, late, context({ signal: controller.signal }));
+    expect(result).toMatchObject({ ok: false, log: { outcome: 'aborted' } });
+    expect(calls).toEqual([]);
+    expect(outcomes).toEqual([{ id: 'rec-1', verified: false }]);
+  });
+
+  it('a run stopped during the confirmation prompt executes nothing, even if the prompt resolves', async () => {
+    const { recoveryEnv, calls } = env();
+    const controller = new AbortController();
+    const requestHuman = vi.fn(() => {
+      controller.abort();
+      return Promise.resolve(true);
+    });
+    const result = await recoverStep(
+      recoveryEnv,
+      backend(propose('e2', { requiresConfirmation: true })).client,
+      context({ signal: controller.signal, requestHuman }),
+    );
+    expect(result).toMatchObject({ ok: false, log: { outcome: 'aborted' } });
+    expect(calls).toEqual([]);
+  });
+
   it('stopping at the confirmation prompt executes nothing', async () => {
     const { recoveryEnv, calls } = env();
     const result = await recoverStep(

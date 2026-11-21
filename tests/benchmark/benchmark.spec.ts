@@ -1,8 +1,8 @@
-import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Page, Worker } from '@playwright/test';
 import { expect, test } from '../e2e/fixtures';
+import { startBackend } from '../e2e/backend';
 import { enableAiRecovery, latestRun, setVariant, startRecording, stopRecording, waitForCapture } from '../e2e/helpers';
 
 /**
@@ -15,10 +15,6 @@ import { enableAiRecovery, latestRun, setVariant, startRecording, stopRecording,
  * and costs nothing.
  */
 
-const API_DIR = path.resolve(import.meta.dirname, '../../apps/api');
-const PYTHON =
-  process.env.FLOWPILOT_PYTHON ??
-  (process.platform === 'win32' ? path.join(API_DIR, '.venv', 'Scripts', 'python.exe') : path.join(API_DIR, '.venv', 'bin', 'python'));
 const TOKEN = 'bench-token-0123456789abcdefghij';
 const OLLAMA_MODEL = process.env.FLOWPILOT_BENCH_OLLAMA_MODEL;
 const OUT_DIR = path.resolve(import.meta.dirname, '../../bench-results');
@@ -109,27 +105,6 @@ interface RunInfo {
   log: { status: string; strategy?: string; recovery?: RecoveryInfo }[];
 }
 
-async function startBackend(env: Record<string, string>, port: number): Promise<ChildProcess> {
-  const child = spawn(PYTHON, ['-m', 'flowpilot_api', 'serve', '--env-file', '.env.bench-unused'], {
-    cwd: API_DIR,
-    env: { ...process.env, ...env, FLOWPILOT_API_TOKEN: TOKEN, FLOWPILOT_PORT: String(port), FLOWPILOT_DB_PATH: ':memory:' },
-    stdio: 'ignore',
-  });
-  await expect
-    .poll(
-      async () => {
-        try {
-          return (await fetch(`http://127.0.0.1:${port}/healthz`)).ok;
-        } catch {
-          return false;
-        }
-      },
-      { timeout: 30_000 },
-    )
-    .toBe(true);
-  return child;
-}
-
 async function storedWorkflowIds(serviceWorker: Worker): Promise<string[]> {
   return serviceWorker.evaluate(async () => {
     const list = (await chrome.storage.local.get('flowpilot.workflows'))['flowpilot.workflows'] as { id: string }[] | undefined;
@@ -197,7 +172,7 @@ for (const [index, mode] of MODES.entries()) {
   test(`benchmark: ${mode.name}`, async ({ context, sidePanel, serviceWorker }) => {
     test.setTimeout(30 * 60_000);
     const port = 8810 + index;
-    const backend = mode.backend ? await startBackend(mode.backend, port) : null;
+    const backend = mode.backend ? await startBackend(mode.backend, port, TOKEN) : null;
     try {
       const demo = await context.newPage();
       if (mode.backend) await enableAiRecovery(serviceWorker, port, TOKEN);

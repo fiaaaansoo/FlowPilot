@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections.abc import Sequence
 from typing import Any
 
@@ -34,7 +35,9 @@ class MockProvider:
         rules: dict[str, str] | None = None,
         confidence: float = 0.9,
         model: str = "mock-1",
+        delay_s: float = 0.0,
     ) -> None:
+        self.delay_s = delay_s
         self.model: str | None = model
         self._responses = list(responses or [])
         self._rules = {key.casefold(): value for key, value in (rules or {}).items()}
@@ -51,6 +54,8 @@ class MockProvider:
         max_output_tokens: int = 1024,
     ) -> ModelReply:
         self.calls.append(list(messages))
+        if self.delay_s:
+            time.sleep(min(self.delay_s, timeout_s))  # simulates a slow model, bounded like a real call
         usage = ProviderUsage(input_tokens=len(system + "".join(m.content for m in messages)) // 4, output_tokens=40)
         if self._responses:
             reply = self._responses.pop(0)

@@ -75,6 +75,7 @@ class Settings:
     context_max_chars: int = 6_000
     db_path: Path = field(default_factory=lambda: Path(".data/flowpilot.sqlite3"))
     mock_rules: dict[str, str] = field(default_factory=dict)
+    mock_delay_ms: int = 0
     #: Prices in USD per million tokens for providers that bill per token (overrides the built-in table).
     price_input: float | None = None
     price_output: float | None = None
@@ -136,6 +137,7 @@ def load_settings(env_file: Path | None = None) -> Settings:
         context_max_chars=_int("FLOWPILOT_CONTEXT_MAX_CHARS", 6_000),
         db_path=Path(os.environ.get("FLOWPILOT_DB_PATH", ".data/flowpilot.sqlite3")),
         mock_rules=rules,
+        mock_delay_ms=_int("FLOWPILOT_MOCK_DELAY_MS", 0),
         price_input=float(price_in) if price_in else None,
         price_output=float(price_out) if price_out else None,
     )

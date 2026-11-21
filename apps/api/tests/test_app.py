@@ -137,3 +137,13 @@ def test_failed_reuse_of_a_memorized_correction_forgets_it(client: TestClient) -
     result = client.post(f"/v1/recovery/{reuse['recoveryId']}/outcome", json=failed, headers=AUTH).json()
     assert result["forgotten"] == 1
     assert client.get("/v1/memory", headers=AUTH).json() == []
+
+
+def test_chunked_oversized_request_is_rejected_end_to_end(client: TestClient) -> None:
+    def chunks():  # no Content-Length: the size is only known while streaming
+        for _ in range(20):
+            yield b"x" * 64_000
+
+    headers = {**AUTH, "Content-Type": "application/json"}
+    response = client.post("/v1/recovery/propose", content=chunks(), headers=headers)
+    assert response.status_code == 413 and response.json()["error"] == "payload_too_large"

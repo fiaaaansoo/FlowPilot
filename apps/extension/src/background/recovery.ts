@@ -266,6 +266,13 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
       ...(usage.model ? { model: usage.model } : {}),
       ...(usage.cacheReadTokens !== null ? { cacheReadTokens: (log.cacheReadTokens ?? 0) + usage.cacheReadTokens } : {}),
     });
+    // A response that arrives after the run was stopped (late answer, ignored abort) is never acted on.
+    if (isAborted(ctx.signal)) {
+      if (response.value.decision.type === 'propose_target') {
+        void backend.reportOutcome(response.value.recoveryId, { contract: RECOVERY_CONTRACT, verified: false, detail: 'run stopped before use' });
+      }
+      return escalate('aborted', ABORTED, 'arrêt demandé');
+    }
 
     // VALIDATE (gateway)
     const validated = validateProposal(response.value, request, observation.value);
@@ -292,6 +299,9 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
       if (!(await ctx.requestHuman(prompt))) return escalate('aborted', ABORTED, 'refusé par l’utilisateur');
       confirmed = true;
     }
+
+    // The run may have been stopped while the user was deciding.
+    if (isAborted(ctx.signal)) return escalate('aborted', ABORTED, 'arrêt demandé');
 
     // EXECUTE + immediate VERIFY (effect checks of the deterministic executor).
     let executed = await env.performRef(ctx.tabId, ctx.step, observation.value.snapshotId, candidate.ref, confirmed, ctx.signal);

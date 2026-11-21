@@ -7,6 +7,7 @@ and executes. Every route except ``/healthz`` requires the bearer token.
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import threading
 from typing import Annotated
@@ -29,6 +30,7 @@ from .contracts import (
     RecoveryRequest,
     RecoveryResponse,
 )
+from .limits import BodyLimitMiddleware
 from .prompts import PROMPT_VERSION
 from .providers import ModelProvider, create_provider
 from .store import Correction, Store
@@ -57,12 +59,8 @@ def create_app(settings: Settings, *, provider: ModelProvider | None = None, sto
         allow_credentials=False,
     )
 
-    @app.middleware("http")
-    async def limit_body(request: Request, call_next):  # type: ignore[no-untyped-def]
-        length = request.headers.get("content-length")
-        if length and length.isdigit() and int(length) > settings.max_request_bytes:
-            return _error(413, "payload_too_large", "The request body exceeds the configured limit.")
-        return await call_next(request)
+    # Outermost: the size limit applies before CORS, auth or JSON parsing see the body.
+    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_bytes)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(_request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -98,13 +96,19 @@ def create_app(settings: Settings, *, provider: ModelProvider | None = None, sto
         }
 
     @app.post("/v1/recovery/propose", dependencies=auth, response_model=RecoveryResponse, response_model_by_alias=True)
-    def propose(body: RecoveryRequest) -> RecoveryResponse:
+    async def propose(body: RecoveryRequest, request: Request) -> RecoveryResponse:
         if not slots.acquire(blocking=False):
             raise HTTPException(status_code=429, detail="busy")
+        cancel = threading.Event()
+        watcher = asyncio.create_task(watch_disconnect(request, cancel))
         try:
-            return agent.propose(body)
+            # The agent runs in a worker thread and checks `cancel` between steps and after every model call;
+            # a disconnected client (the extension aborted the replay) therefore never gets a proposal acted on.
+            # An in-flight provider call is not interrupted: it ends within its own timeout, then is discarded.
+            return await asyncio.to_thread(agent.propose, body, cancel=cancel)
         finally:
-            slots.release()
+            watcher.cancel()
+            slots.release()  # released only once the worker thread is done: the concurrency bound stays true
 
     @app.post("/v1/recovery/{recovery_id}/outcome", dependencies=auth)
     def outcome(recovery_id: str, body: OutcomeReport) -> dict[str, object]:
@@ -185,3 +189,12 @@ _MESSAGES = {
     "target_mismatch": "The reported target is not the element that was proposed.",
     "unknown_correction": "Unknown memory entry.",
 }
+
+
+async def watch_disconnect(request: Request, cancel: threading.Event, interval_s: float = 0.25) -> None:
+    """Sets ``cancel`` as soon as the client goes away (aborted fetch, closed connection)."""
+    while not cancel.is_set():
+        if await request.is_disconnected():
+            cancel.set()
+            return
+        await asyncio.sleep(interval_s)

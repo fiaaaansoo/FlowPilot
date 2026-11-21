@@ -32,5 +32,5 @@ def create_provider(settings: Settings) -> ModelProvider | None:
     if settings.provider == "mock":
         from .mock import MockProvider
 
-        return MockProvider(rules=settings.mock_rules)
+        return MockProvider(rules=settings.mock_rules, delay_s=settings.mock_delay_ms / 1000)
     raise ProviderError("not_configured", f"Unknown provider {settings.provider!r}")

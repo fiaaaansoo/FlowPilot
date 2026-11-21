@@ -27,6 +27,7 @@ Acceptance policy (reliability over autonomy):
 from __future__ import annotations
 
 import json
+import threading
 import time
 import uuid
 from collections import Counter
@@ -100,6 +101,8 @@ class _Run:
     pack: ContextPack | None = None
     #: Elements the recovery may use (compatible, same origin, not rejected), computed once.
     usable: list[Candidate] = field(default_factory=list)
+    #: Set by the caller when the client is gone: the run stops at the next check and proposes nothing.
+    cancel: threading.Event = field(default_factory=threading.Event)
     #: Memorized correction reused by this recovery, forgotten if the reuse fails.
     correction_id: int | None = None
     #: Refs the model has seen (context, search results, inspections): the only refs it may propose.
@@ -118,9 +121,11 @@ class RecoveryAgent:
 
     # --- entry point ------------------------------------------------------------
 
-    def propose(self, request: RecoveryRequest) -> RecoveryResponse:
+    def propose(self, request: RecoveryRequest, *, cancel: threading.Event | None = None) -> RecoveryResponse:
         started = time.perf_counter()
         run = _Run(request=request, started=started, deadline=started + request.budget.timeout_ms / 1000)
+        if cancel is not None:
+            run.cancel = cancel
         decision = self._decide(run)
         return self._finish(run, decision)
 
@@ -214,6 +219,8 @@ class RecoveryAgent:
         ]
         invalid = 0
         while True:
+            if run.cancel.is_set():
+                return self._escalate(run, "llm", "Recovery cancelled by the client.")
             if run.calls >= budget.max_model_calls:
                 return self._escalate(run, "llm", "Model call budget exhausted.")
             if time.perf_counter() > run.deadline:
@@ -222,6 +229,8 @@ class RecoveryAgent:
                 reply = self._call(run, messages)
             except ProviderError as exc:
                 return self._escalate(run, "llm", f"Model provider error ({exc.code}): {exc}")
+            if run.cancel.is_set():  # the answer arrived after the client left: discard it
+                return self._escalate(run, "llm", "Recovery cancelled by the client.")
             if run.input_tokens + run.output_tokens > budget.max_tokens:
                 return self._escalate(run, "llm", "Token budget exhausted.")
             if run.cost > budget.max_cost_usd:
