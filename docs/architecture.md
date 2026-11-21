@@ -1,49 +1,49 @@
-# Architecture de FlowPilot
+# FlowPilot architecture
 
-État au Sprint 2 (recorder et moteur de workflow déterministes, sans IA). Ce document décrit les frontières entre modules et les choix qui les justifient. Les modules à venir (grounding sémantique, Recovery Agent, mémoire, évaluation) s'y brancheront sans refonte : voir [Préparation du Sprint 3](#préparation-du-sprint-3).
+State as of Sprint 3: deterministic recorder and workflow engine (Sprint 2) plus optional AI recovery through a local service. This document describes the boundaries between modules and the choices that justify them; AI recovery is detailed in [recovery.md](recovery.md) and summarized in [decision 12](#12-optional-ai-recovery-behind-a-validating-gateway-sprint-3).
 
-## Vue d'ensemble
+## Overview
 
 ```text
 ┌──────────── Side Panel (React) ─────────────┐
-│ lit : chrome.storage + permissions          │
-│ écrit : rien (envoie des Command)           │
-│ demande les permissions d'hôte (geste UI)   │
-│ keepalive du SW pendant un replay           │
+│ reads: chrome.storage + permissions         │
+│ writes: nothing (sends Commands)            │
+│ requests host permissions (UI gesture)      │
+│ SW keepalive during a replay                │
 └───────────────┬─────────────────────────────┘
                 │ Command (record/start, session/stop, replay/start, replay/continue…)
                 ▼
 ┌──────────── Service worker ─────────────────┐
-│ SessionController (seul écrivain)           │
-│  ├─ machine d'état (packages/shared)        │
-│  ├─ recorder  → brouillon d'événements      │
+│ SessionController (sole writer)             │
+│  ├─ state machine (packages/shared)         │
+│  ├─ recorder  → event draft                 │
 │  │              → compileSteps (shared)     │
 │  ├─ executor  → StepDriver (navigate, wait, │
 │  │              perform, requestHuman)      │
 │  └─ stores    → session / workflows / runs  │
-│ tabs.onUpdated → navigations (SPA comprises)│
-│ BrowserEnv = adaptateur chrome.* (injecté)  │
+│ tabs.onUpdated → navigations (SPA included) │
+│ BrowserEnv = chrome.* adapter (injected)    │
 └───────┬───────────────────────▲─────────────┘
         │ content/ping, record, │ recorder/event (capture)
-        │ perform               │ content/hello (dois-je capturer ?)
+        │ perform               │ content/hello (should I capture?)
         ▼                       │
-┌──────────── Content script (IIFE, frame principale) ─┐
-│ InteractionCapture : gestes isTrusted, filtre        │
-│   des champs sensibles AVANT tout envoi              │
-│ grounding : describeElement / resolveTarget          │
-│ performStep : actions DOM prédéfinies + vérification │
+┌──────────── Content script (IIFE, main frame) ───────┐
+│ InteractionCapture: isTrusted gestures, filtering    │
+│   of sensitive fields BEFORE anything is sent        │
+│ grounding: describeElement / resolveTarget           │
+│ performStep: predefined DOM actions + verification   │
 └──────────────────────────────────────────────────────┘
 ```
 
-## Décisions
+## Decisions
 
-### 1. Un seul écrivain : le service worker
+### 1. A single writer: the service worker
 
-Le Side Panel n'écrit jamais l'état de session. Il envoie des commandes typées (`packages/shared/src/messages.ts`) et se redessine sur `chrome.storage.onChanged`. Le `SessionController` sérialise **commandes et événements** dans une file : un double-clic ne lance pas deux enregistrements, deux événements de capture n'écrasent pas le brouillon l'un de l'autre.
+The Side Panel never writes the session state. It sends typed commands (`packages/shared/src/messages.ts`) and redraws itself on `chrome.storage.onChanged`. The `SessionController` serializes **commands and events** in a queue: a double click does not start two recordings, and two capture events do not overwrite each other's draft.
 
-Exception assumée : `chrome.permissions.request` doit être appelé depuis une page, dans le geste utilisateur. Le Side Panel gère donc lui-même les permissions d'hôte.
+Accepted exception: `chrome.permissions.request` must be called from a page, within the user gesture. The Side Panel therefore manages host permissions itself.
 
-### 2. Machine d'état pure et partagée
+### 2. Pure, shared state machine
 
 ```text
 idle ──RECORD_STARTED──▶ recording ──STOPPED──▶ idle
@@ -51,123 +51,154 @@ idle ──REPLAY_STARTED──▶ replaying ──STOPPED | REPLAY_FINISHED─�
 replaying ──HUMAN_REQUESTED──▶ replaying (awaitingHuman) ──HUMAN_RESOLVED──▶ replaying
 ```
 
-`packages/shared/src/session.ts`, sans dépendance Chrome. Une transition invalide renvoie `INVALID_TRANSITION`, jamais une exception silencieuse.
+`packages/shared/src/session.ts`, with no Chrome dependency. An invalid transition returns `INVALID_TRANSITION`, never a silent exception.
 
-### 3. État volatil et état persistant séparés
+### 3. Volatile and persistent state kept separate
 
-| Zone | Contenu | Pourquoi |
+| Area | Content | Why |
 | --- | --- | --- |
-| `chrome.storage.session` | session, brouillon d'enregistrement | Survit aux redémarrages du service worker. Effacé à la fermeture du navigateur. Inaccessible aux content scripts. |
-| `chrome.storage.local` | workflows, historique des runs (50 derniers) | Doit survivre à la fermeture de l'extension et du navigateur. Base de la future mémoire et de l'évaluation. |
+| `chrome.storage.session` | session, recording draft | Survives service worker restarts. Cleared when the browser closes. Inaccessible to content scripts. |
+| `chrome.storage.local` | workflows, run history (last 50) | Must survive closing the extension and the browser. Basis for the future memory and evaluation. |
 
-Au redémarrage du worker, `recover()` reprend un enregistrement tel quel (brouillon et capture persistent). Un replay orphelin, dont la boucle vivait en mémoire, est marqué en échec et la session est libérée.
+When the worker restarts, `recover()` resumes a recording as is (draft and capture persist). An orphaned replay, whose loop lived in memory, is marked as failed and the session is released.
 
-### 4. Dépendances Chrome injectées
+### 4. Injected Chrome dependencies
 
-`SessionController` reçoit un `BrowserEnv` et des stores construits sur `KeyValueArea`. En production : `chrome-env.ts` et `chromeArea`. En test : `FakeEnv` et `memoryArea`. Toute la logique (permissions, onglets, confirmations, arrêts, redémarrages) est testée sans navigateur ; Playwright valide ensuite l'intégration réelle sur le build distribué.
+`SessionController` receives a `BrowserEnv` and stores built on `KeyValueArea`. In production: `chrome-env.ts` and `chromeArea`. In tests: `FakeEnv` and `memoryArea`. All the logic (permissions, tabs, confirmations, stops, restarts) is tested without a browser; Playwright then validates the real integration on the shipped build.
 
-### 5. Enregistrement en deux temps : capture brute, compilation pure
+### 5. Two-phase recording: raw capture, pure compilation
 
-1. **Capture.** Le content script émet des `RecordedEvent` horodatés ; le service worker ajoute des `NavigationEvent` observés via `tabs.onUpdated` (`changeInfo.url` couvre aussi `history.pushState`, donc les SPA). Tout est stocké brut dans le brouillon (1 000 événements au plus).
-2. **Compilation.** `compileSteps` (`packages/shared/src/recording.ts`, pure) trie par horodatage, puis :
-   - fusionne les saisies successives dans le même champ (et sélections, cases) ;
-   - réduit un double-clic à un clic ;
-   - garde tous les clics, même rapprochés (deux clics sur « + » en sont deux) ;
-   - ignore une navigation vers l'URL courante (rechargement) ;
-   - fusionne les navigations rapprochées (chaîne de redirections) ;
-   - classe une navigation `waitForNavigation` si elle est causée par une interaction : moins de 3 s après, ou plus tard si la page a signalé son départ (`beforeunload`) juste après l'interaction (formulaire lent) ; `navigate` sinon (URL saisie, historique).
+1. **Capture.** The content script emits timestamped `RecordedEvent`s; the service worker adds `NavigationEvent`s observed via `tabs.onUpdated` (`changeInfo.url` also covers `history.pushState`, hence SPAs). Everything is stored raw in the draft (1,000 events at most).
+2. **Compilation.** `compileSteps` (`packages/shared/src/recording.ts`, pure) sorts by timestamp, then:
+   - merges successive inputs in the same field (and selections, checkboxes);
+   - reduces a double click to a single click;
+   - keeps all clicks, even close together (two clicks on « + » stay two clicks);
+   - ignores a navigation to the current URL (reload);
+   - merges navigations close together (redirect chain);
+   - classifies a navigation as `waitForNavigation` if it is caused by an interaction: less than 3 s after it, or later if the page signaled its departure (`beforeunload`) right after the interaction (slow form); `navigate` otherwise (typed URL, history).
 
-Le tri par horodatage règle la course entre le message de clic (content script) et l'événement de navigation (service worker) : l'ordre d'arrivée n'a pas d'importance. Le Side Panel compile le même brouillon pour afficher les étapes en direct.
+Sorting by timestamp settles the race between the click message (content script) and the navigation event (service worker): arrival order does not matter. The Side Panel compiles the same draft to display the steps live.
 
-**Ce que la capture retient** : uniquement les événements `isTrusted` (un script de la page ne peut pas fabriquer d'étape) ; clics ramenés à l'élément interactif le plus proche, ou à défaut au plus haut ancêtre affiché comme cliquable (`cursor: pointer`) — les clics de mise au focus, sur une case ou son label, et sur du texte inerte sont ignorés ; saisies émises à la validation (`change`) ou avant toute action qui peut quitter la page ; Entrée : soumission (`submit`) seulement sans bouton déclencheur, sinon étape `press` transmise aux scripts de la page (recherche d'application monopage).
+**What capture keeps**: only `isTrusted` events (a page script cannot fabricate a step); clicks reduced to the nearest interactive element, or failing that to the topmost ancestor displayed as clickable (`cursor: pointer`) — focus clicks, clicks on a checkbox or its label, and clicks on inert text are ignored; inputs emitted on commit (`change`) or before any action that may leave the page; Enter: submission (`submit`) only when there is no triggering button, otherwise a `press` step passed to the page scripts (single-page application search).
 
-**Confidentialité à la capture** : la valeur d'un champ, d'une liste ou d'une case sensibles n'est jamais lue (étape `manualInput`). Les URL (page de départ, navigations, `href` des liens) sont assainies avant tout stockage : paramètres de type jeton, code, session, signature et fragments `#…=` (OAuth) sont retirés.
+**Privacy at capture**: the value of a sensitive field, list or checkbox is never read (`manualInput` step). URLs (start page, navigations, link `href`s) are sanitized before any storage: token-, code-, session- and signature-type parameters and `#…=` fragments (OAuth) are removed.
 
-**Réinjection.** Pendant un enregistrement, le content script est enregistré dynamiquement (`chrome.scripting.registerContentScripts`, domaine enregistré uniquement, `document_end`, non persistant) : il est présent dès le chargement de chaque page, sans attendre le chargement complet. Au démarrage, il demande au service worker (`content/hello`) s'il doit capturer : seul l'onglet enregistré répond oui. L'enregistrement dynamique est retiré à l'arrêt, et au démarrage du worker si aucune session n'est active.
+**Reinjection.** During a recording, the content script is registered dynamically (`chrome.scripting.registerContentScripts`, recorded domain only, `document_end`, non-persistent): it is present as soon as each page loads, without waiting for the full load. At startup, it asks the service worker (`content/hello`) whether it should capture: only the recorded tab answers yes. The dynamic registration is removed on stop, and at worker startup if no session is active.
 
-### 6. Schéma de workflow v2
+### 6. Workflow schema v2
 
-`schemaVersion: 2`, étapes typées : `navigate`, `waitForNavigation`, `click`, `input`, `manualInput`, `select`, `check`, `submit`. Les étapes d'interaction portent une `ElementTarget` multi-indices :
+`schemaVersion: 2`, typed steps: `navigate`, `waitForNavigation`, `click`, `input`, `manualInput`, `select`, `check`, `submit`. Interaction steps carry a multi-cue `ElementTarget`:
 
-| Indice | Exemple | Fiabilité |
+| Cue | Example | Reliability |
 | --- | --- | --- |
-| `attributes` (data-testid, id non généré, name, aria-label, placeholder, type, href, value des cases) | `{ name: 'contrat', type: 'checkbox', value: 'CDI' }` | forte |
-| `role` + `name` (nom accessible) | `button` / « Rechercher » | forte |
-| `css` (sélecteur unique à l'enregistrement) | `#search > button` | fragile (structure) |
-| `text` (texte visible) | « Sauvegarder » | fragile (contenu) |
+| `attributes` (data-testid, non-generated id, name, aria-label, placeholder, type, href, checkbox value) | `{ name: 'contrat', type: 'checkbox', value: 'CDI' }` | strong |
+| `role` + `name` (accessible name) | `button` / « Rechercher » (Search) | strong |
+| `css` (selector unique at recording time) | `#search > button` | fragile (structure) |
+| `text` (visible text) | « Sauvegarder » (Save) | fragile (content) |
 
-S'y ajoute `context` : le texte de la ligne qui contient l'élément (élément de liste, rangée, carte), enregistré seulement quand d'autres éléments de la page ont le même rôle et le même nom. Il départage des boutons identiques (« Supprimer l'alerte ») sans dépendre de leur position, et il est affiché dans les invites de confirmation pour savoir quelle ligne est visée.
+`context` is added to these: the text of the row that contains the element (list item, row, card), recorded only when other elements on the page have the same role and the same name. It tells identical buttons apart (« Supprimer l'alerte », "Delete the alert") without depending on their position, and it is shown in confirmation prompts so the user knows which row is targeted.
 
-Toute lecture passe par `parseWorkflow`, qui reconstruit l'objet champ par champ, borne les tailles, rejette les types et versions inconnus et migre les workflows v1. Les ids générés par les frameworks (`:r1:`, `ember123`, hash) ne sont pas retenus comme indices.
+Every read goes through `parseWorkflow`, which rebuilds the object field by field, bounds sizes, rejects unknown types and versions and migrates v1 workflows. Ids generated by frameworks (`:r1:`, `ember123`, hashes) are not kept as cues.
 
-### 7. Grounding déterministe, qui refuse l'ambiguïté
+### 7. Deterministic grounding that refuses ambiguity
 
-`resolveTarget` (`apps/extension/src/grounding/resolve.ts`) ne garde que des candidats **visibles** et sépare deux familles d'indices :
+`resolveTarget` (`apps/extension/src/grounding/resolve.ts`) keeps only **visible** candidates and separates two families of cues:
 
-1. **Indices forts** (identifiant de test, id, rôle + nom, attributs) : ceux qui ne trouvent rien sont ignorés, l'élément retenu est dans l'intersection des autres ; s'ils divergent, `TARGET_AMBIGUOUS`.
-2. **Plusieurs candidats forts** : départagés uniquement par la ligne (`context`) ; jamais par la position (CSS) ni le texte, qui désigneraient l'élément situé au même endroit après l'insertion ou la suppression d'une ligne. Ligne disparue → `TARGET_NOT_FOUND`.
-3. **Indices fragiles** (CSS, texte) : utilisés seuls uniquement si la cible n'avait aucun indice fort. Si elle en avait et qu'ils ne trouvent plus rien, l'élément a changé : `TARGET_NOT_FOUND` (cas que traitera le Recovery Agent), plutôt qu'un clic sur ce qui occupe sa place.
+1. **Strong cues** (test id, id, role + name, attributes): those that find nothing are ignored, and the chosen element lies in the intersection of the others; if they diverge, `TARGET_AMBIGUOUS`.
+2. **Several strong candidates**: told apart only by the row (`context`); never by position (CSS) or text, which would designate the element located at the same place after a row is inserted or removed. Row gone → `TARGET_NOT_FOUND`.
+3. **Fragile cues** (CSS, text): used alone only if the target had no strong cue. If it had some and they find nothing anymore, the element has changed: `TARGET_NOT_FOUND` (the case the Recovery Agent will handle), rather than a click on whatever occupies its place.
 
-Rien de visible → `TARGET_NOT_INTERACTABLE` (présent mais masqué) ou `TARGET_NOT_FOUND`. `waitForTarget` réessaie jusqu'à 10 s (éléments chargés en différé), sauf ambiguïté, renvoyée tout de suite ; l'arrêt du replay interrompt l'attente.
+Nothing visible → `TARGET_NOT_INTERACTABLE` (present but hidden) or `TARGET_NOT_FOUND`. `waitForTarget` retries for up to 10 s (lazily loaded elements), except for ambiguity, which is returned immediately; stopping the replay interrupts the wait.
 
-### 8. Replay : executor indépendant, effets vérifiés
+### 8. Replay: independent executor, verified effects
 
-`runWorkflow` exécute les étapes dans l'ordre via un `StepDriver`, ne rejette jamais (toute exception devient un échec d'étape) et produit un `RunSummary` avec un **journal par étape** (statut, durée, stratégie de grounding, code et message d'erreur). Chaque type d'étape a son handler dans une table typée : un `kind` sans handler ne compile pas.
+`runWorkflow` executes the steps in order through a `StepDriver`, never rejects (any exception becomes a step failure) and produces a `RunSummary` with a **per-step log** (status, duration, grounding strategy, error code and message). Each step type has its handler in a typed table: a `kind` without a handler does not compile.
 
-- `navigate` / `waitForNavigation` : l'état de l'onglet est interrogé (`status: complete`, 15 s max) plutôt qu'écouté, ce qui évite toute course avec une navigation déjà terminée. L'URL est comparée par `urlMatches` : même origine et même chemin, paramètres enregistrés identiques sauf paramètres volatils (suivi, horodatage) ou secrets, fragment pris en compte seulement pour le routage `#/`. Puis le content script doit répondre depuis la bonne origine.
-- Interactions : `performStep` dans la page, via les setters natifs + événements `input`/`change` (compatibles React/Vue), puis vérification de l'effet (valeur conservée, case cochée, option existante). Avant un clic ou une soumission, la page répond au service worker, puis agit : un port fermé signifie qu'elle a disparu **avant** d'agir, c'est un échec.
-- Arrêt : un `AbortSignal` traverse l'executor, les attentes et les actions ; le service worker envoie aussi `content/cancel`, pour que la page n'agisse pas quand l'élément attendu finit par apparaître. Un nouveau replay est refusé tant que le précédent n'a pas fini son étape. Un échec provoqué par l'arrêt est journalisé `aborted`, pas `failed`.
+- `navigate` / `waitForNavigation`: the tab state is polled (`status: complete`, 15 s max) rather than listened to, which avoids any race with a navigation that has already finished. The URL is compared with `urlMatches`: same origin and same path, recorded parameters identical except volatile parameters (tracking, timestamp) or secrets, fragment taken into account only for `#/` routing. Then the content script must answer from the right origin.
+- Interactions: `performStep` in the page, via the native setters + `input`/`change` events (React/Vue compatible), then verification of the effect (value kept, checkbox checked, option exists). Before a click or a submission, the page answers the service worker, then acts: a closed port means it disappeared **before** acting, which is a failure.
+- Stop: an `AbortSignal` goes through the executor, the waits and the actions; the service worker also sends `content/cancel`, so that the page does not act if the awaited element eventually appears. A new replay is refused until the previous one has finished its step. A failure caused by the stop is logged as `aborted`, not `failed`.
 
-### 9. Intervention humaine (human-in-the-loop)
+### 9. Human intervention (human-in-the-loop)
 
-Deux cas suspendent le replay avant l'étape (`awaitingHuman`), le Side Panel affiche une invite :
+Two cases suspend the replay before the step (`awaitingHuman`), and the Side Panel displays a prompt:
 
-- **action potentiellement irréversible** (`confirm: true`, posé à la capture par une heuristique large : envoyer, payer, supprimer, publier, postuler, confirmer…) : rien n'est exécuté sans « Confirmer et exécuter » ;
-- **champ sensible** (`manualInput`) : la valeur n'a jamais été enregistrée ; l'utilisateur la saisit dans la page puis continue, et FlowPilot vérifie seulement que le champ n'est plus vide.
+- **potentially irreversible action** (`confirm: true`, set at capture by a broad heuristic: send, pay, delete, publish, apply, confirm…): nothing is executed without « Confirmer et exécuter » (Confirm and run);
+- **sensitive field** (`manualInput`): the value was never recorded; the user types it in the page then continues, and FlowPilot only checks that the field is no longer empty.
 
-Défense en profondeur : au moment d'agir, la page rejuge l'élément **effectivement trouvé**. S'il paraît irréversible alors que l'étape n'était pas marquée (heuristique d'enregistrement prise en défaut, mauvais élément), elle refuse (`CONFIRMATION_REQUIRED`) ; l'executor demande alors l'accord humain et réessaie une seule fois.
+Defense in depth: when acting, the page re-judges the element **actually found**. If it looks irreversible although the step was not marked (recording heuristic missed, wrong element), it refuses (`CONFIRMATION_REQUIRED`); the executor then asks for human approval and retries once.
 
-Pendant un replay, le Side Panel envoie un `session/get` toutes les 20 s : le service worker MV3 serait sinon arrêté après ~30 s d'inactivité pendant une attente de confirmation.
+During a replay, the Side Panel sends a `session/get` every 20 s: the MV3 service worker would otherwise be stopped after ~30 s of inactivity while waiting for a confirmation.
 
-### 10. Permissions minimales et provenance des messages
+### 10. Minimal permissions and message provenance
 
-- `permissions` : `sidePanel`, `storage`, `scripting`. Rien d'autre (vérifié par `manifest.test.ts`).
-- `optional_host_permissions` : `https://*/*`, `http://localhost/*`, `http://127.0.0.1/*`. Aucun hôte à l'installation ; accès accordé domaine par domaine.
-- Pas de permission `tabs` ni `webNavigation` : l'URL d'un onglet n'est visible que sur un site autorisé. Les navigations hors des sites autorisés ne sont ni vues ni enregistrées.
-- **Commandes** : acceptées seulement si `sender.url` est une page de l'extension.
-- **Événements de capture** : acceptés seulement depuis un content script de l'extension, frame principale (`frameId === 0`), et retenus seulement pour l'onglet en cours d'enregistrement. Chaque événement est revalidé (`parseRecordedEvent`), ses horodatages bornés.
-- **Étapes envoyées à la page** : revalidées par le content script ; seules des actions DOM prédéfinies existent, aucun code reçu n'est évalué.
+- `permissions`: `sidePanel`, `storage`, `scripting`. Nothing else (verified by `manifest.test.ts`).
+- `optional_host_permissions`: `https://*/*`, `http://localhost/*`, `http://127.0.0.1/*`. No host at install time; access granted domain by domain.
+- No `tabs` or `webNavigation` permission: a tab's URL is visible only on an allowed site. Navigations outside the allowed sites are neither seen nor recorded.
+- **Commands**: accepted only if `sender.url` is an extension page.
+- **Capture events**: accepted only from an extension content script, main frame (`frameId === 0`), and kept only for the tab being recorded. Each event is revalidated (`parseRecordedEvent`), its timestamps bounded.
+- **Steps sent to the page**: revalidated by the content script; only predefined DOM actions exist, no received code is evaluated.
 
-### 11. Build : un build principal qui déclenche celui du content script
+### 11. Build: a main build that triggers the content script build
 
-Le service worker est un module ES, qui partage des chunks avec le Side Panel. Le content script doit être un script classique autonome : il est compilé en IIFE par `vite.content.config.ts`, lancé par le plugin `flowpilot-content-script` après chaque build principal, watch compris. Les tests e2e chargent **le `dist/` distribué** : la fixture Playwright le copie et n'ajoute `host_permissions` (localhost) qu'au manifest de la copie.
+The service worker is an ES module, which shares chunks with the Side Panel. The content script must be a standalone classic script: it is compiled as an IIFE by `vite.content.config.ts`, launched by the `flowpilot-content-script` plugin after each main build, watch included. The e2e tests load **the shipped `dist/`**: the Playwright fixture copies it and adds `host_permissions` (localhost) only to the copy's manifest.
 
-## Préparation du Sprint 3
+### 12. Optional AI recovery behind a validating gateway (Sprint 3)
 
-| Brique | Point d'insertion existant |
+Details: [AI recovery](recovery.md). Decisions: [ADR 0001](adr/0001-local-first-provider-abstraction.md)
+(local-first providers, no fallback), [ADR 0002](adr/0002-explicit-state-machine.md) (explicit state
+machine), [ADR 0003](adr/0003-verified-memory-sqlite.md) (verified memory in SQLite),
+[ADR 0004](adr/0004-claude-subscription-mode.md) (no Claude.ai subscription mode).
+
+- A separate local service (`apps/api`, FastAPI) proposes a replacement element when a deterministic
+  step fails with `TARGET_NOT_FOUND` or `TARGET_AMBIGUOUS`. It never receives browser privileges: it
+  answers with a `ref` chosen among the elements the extension observed.
+- The executor calls an optional `recover` hook through `StepDriver`; with AI recovery disabled (the
+  default) the hook returns nothing and replay is identical to Sprint 2.
+- The service worker validates every response (binding to run, step and snapshot; observed ref; step
+  kind; same origin), asks the user when required, and executes the **recorded** action through the
+  same `actOn` code path as deterministic replay. The content script revalidates snapshot, URL and
+  element identity just before acting.
+- A recovery counts as verified only when the next step succeeds; only then is the correction memorized.
+- Budgets bound every request and every run (model calls, tokens, time, cost), checked before each model call.
+- Autonomy is narrow by design. A model proposal acts alone only for a click, when the deterministic ranking
+  independently agrees with it and it shares label words, an identifier or context with the recorded element.
+  Everything else — pure synonyms, value or submission steps, corrections learned in another workflow — is
+  confirmed by the user. The service worker re-applies these rules itself and does not rely on the backend flag.
+- Cancellation is cooperative. A stopped replay aborts the request, discards late answers and never acts after a
+  stop. The backend cancels on client disconnect between agent steps, but an in-flight model call runs to its
+  timeout. A suspended service worker takes pending requests with it, and its run is marked failed on restart.
+- Request bodies are limited while they stream in (ASGI middleware), not from `Content-Length`.
+
+| Sprint 2 insertion point | Sprint 3 implementation |
 | --- | --- |
-| Recovery Agent | `runWorkflow` : un échec d'étape (`TARGET_NOT_FOUND`, `TARGET_AMBIGUOUS`, `VERIFICATION_FAILED`) est typé et journalisé ; l'agent s'insère entre l'échec et l'arrêt du run, derrière `StepDriver`, avec une limite de tentatives. |
-| Tool Calling | Les actions possibles sont déjà une liste fermée (`ElementStep` + `performStep`) validée par `parseWorkflowStep` : l'agent proposera une étape typée, revalidée avant exécution, jamais du JavaScript. |
-| Grounding sémantique | `resolveTarget` renvoie des codes distincts et les candidats par stratégie ; l'`ElementTarget` (rôle, nom, texte, attributs) est la description à rapprocher sémantiquement. |
-| Context Engineering | `describeElement` / `accessibleName` produisent déjà une vue compacte et sans valeurs saisies d'un élément ; à étendre en résumé du DOM autour de la cible. |
-| Prompt Injection Defense | Le contenu de la page n'entre que comme donnée (textes bornés, revalidés) ; les instructions de l'agent viendront du workflow et de l'extension, jamais de la page. |
-| Mémoire des corrections | `RunStore` (historique borné, journaux par étape et stratégie) + workflows versionnés : une correction validée deviendra une mise à jour de l'`ElementTarget` (nouvelle version de schéma si nécessaire). |
-| Prompt Caching | Le préfixe stable (consignes, schéma des outils, description du workflow) est séparé du contexte variable (DOM de l'étape) dans les messages construits côté backend. |
-| Évaluation | `RunSummary.log` donne déjà réussite, étape en échec, durée et stratégie par étape ; il manque le coût (requêtes, tokens) et les variantes d'interface du site de démo (Sprint 4). |
+| `runWorkflow` failure path | `StepDriver.recover` / `reportOutcome`, `background/recovery.ts` |
+| Closed action list | The model picks a ref; action and value come from the recorded step |
+| `ElementTarget` description | Semantic grounding (`grounding.py`) before any model call |
+| `describeElement` / `accessibleName` | `grounding/observe.ts` (bounded, sanitized observation) |
+| Page content as data | `<untrusted_page_content>`, schema-forced output, gateway checks |
+| `RunStore` | `StepLog.recovery` telemetry; corrections stored by the backend |
+| Stable prompt prefix | Versioned prompt, `cache_control` on the system prompt with Anthropic |
+| Evaluation | Demo-site variants (`?variante=`), `tests/e2e/recovery.spec.ts`, `npm run bench` |
 
-## Limites connues (Sprint 2)
+## Known limitations
 
-- Frame principale uniquement : les interactions dans des iframes ne sont ni capturées ni rejouées.
-- Shadow DOM non parcouru par le grounding ; `contenteditable` non capturé.
-- Pas de capture des glisser-déposer, survols, défilements, raccourcis clavier (hors Entrée) ni des téléversements de fichiers. Les clics sur des éléments sans rôle ni `cursor: pointer` sont ignorés.
-- Les navigations vers un site non autorisé ne sont pas observables (pas de permission `tabs`) : le replay échouera explicitement à l'étape correspondante.
-- `waitForNavigation` tolère les paramètres volatils connus, mais pas un identifiant dynamique dans le chemin (`/commande/12345`) ni un paramètre métier qui change à chaque visite.
-- La classification `navigate` / `waitForNavigation` reste heuristique (fenêtre de 3 s et départ de page) : une URL saisie moins de 3 s après une interaction peut être prise pour une conséquence de celle-ci.
-- Un élément dont les indices forts ont changé (libellé modifié) est déclaré introuvable : c'est volontaire, le Recovery Agent du Sprint 3 traitera ce cas.
-- Un élément sans aucun indice fort ni texte (icône cliquable sans nom) n'est retrouvé que par son sélecteur CSS, donc par sa position.
-- L'heuristique « irréversible » sur-confirme (« Annuler », « Mes commandes », « Order by ») : c'est le compromis choisi.
-- Les paramètres d'URL `code` et `state` ne sont retirés qu'ensemble (retour OAuth) ; seuls, ce sont souvent des paramètres métier.
-- Si la sauvegarde d'un workflow échoue (stockage plein), le brouillon est conservé, mais le prochain enregistrement le remplace : aucune reprise n'est proposée.
-- L'heuristique « irréversible » est volontairement large (ex. « Postuler ») : quelques confirmations superflues.
-- Le replay agit sur l'onglet actif de la dernière fenêtre utilisée et ne survit pas à un redémarrage du service worker (marqué en échec). Sans Side Panel ouvert, une attente de confirmation de plus de ~30 s peut être interrompue par l'arrêt du worker.
-- Les workflows ne sont ni renommables ni modifiables depuis le panneau.
+- Main frame only: interactions inside iframes are neither captured nor replayed.
+- Shadow DOM is not traversed by grounding; `contenteditable` is not captured.
+- No capture of drag and drop, hovers, scrolls, keyboard shortcuts (other than Enter) or file uploads. Clicks on elements with no role and no `cursor: pointer` are ignored.
+- Navigations to a non-allowed site cannot be observed (no `tabs` permission): the replay will fail explicitly at the corresponding step.
+- `waitForNavigation` tolerates the known volatile parameters, but not a dynamic identifier in the path (`/commande/12345`) nor a business parameter that changes on every visit.
+- The `navigate` / `waitForNavigation` classification remains heuristic (3 s window and page departure): a URL typed less than 3 s after an interaction may be mistaken for a consequence of it.
+- An element whose strong cues have changed (label modified) is declared not found by the deterministic engine; with AI recovery enabled, the Sprint 3 recovery flow handles it.
+- An element with no strong cue and no text (clickable icon without a name) is found only by its CSS selector, hence by its position.
+- The "irreversible" heuristic over-confirms (« Annuler » (Cancel), « Mes commandes » (My orders), « Order by »): this is the chosen trade-off.
+- The `code` and `state` URL parameters are removed only together (OAuth return); on their own, they are often business parameters.
+- If saving a workflow fails (storage full), the draft is kept, but the next recording replaces it: no recovery is offered.
+- The "irreversible" heuristic is deliberately broad (e.g. « Postuler » (Apply)): a few superfluous confirmations.
+- Replay acts on the active tab of the last used window and does not survive a service worker restart (marked as failed). Without an open Side Panel, a confirmation wait of more than ~30 s may be interrupted by the worker stopping.
+- Workflows can be neither renamed nor edited from the panel.
+- AI recovery handles element steps only (not navigations, URL waits or manual input), on the main
+  frame, and needs the local service to be running; it does not edit the recorded workflow (corrections
+  live in the service's memory).
+- An in-flight model call is not interrupted when a replay is stopped; its answer is discarded.
+- Recovery confidence comes from heuristics and the model: thresholds are conservative, so some
+  correct proposals still ask for confirmation.

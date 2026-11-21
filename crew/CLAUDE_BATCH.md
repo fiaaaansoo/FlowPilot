@@ -5,18 +5,12 @@ One batch = one Claude. See § Batching in `crew/CLAUDE_CONTEXT/LIFECYCLE.md` fo
 
 ## Unsorted
 
-_Aucune tâche non classée._
+_No unsorted task._
 
-## Batch A — Fondations extension (séquentiel : chaque sprint dépend du précédent)
+## Batch B — Agentic backend and evaluation (sequential: Sprint 4 depends on Sprint 3)
 
-Zone : package.json, apps/extension/, apps/demo-site/, packages/shared/, tests/, docs/, .github/, README.md, AGENTS.md
+Zone : `package.json`, `playwright.config.ts`, `playwright.benchmark.config.ts`, `tsconfig.json`, `eslint.config.js`, `.gitignore`, `apps/api/`, `apps/extension/`, `apps/demo-site/`, `packages/shared/`, `tests/`, `docs/`, `.github/`, `README.md`, `AGENTS.md`, `SECURITY.md`, `CONTRIBUTING.md`
 
-- ~~`sprint-1-extension-scaffold.md`~~
-- ~~`sprint-2-record-replay.md`~~
-
-## Batch B — Backend agentique et évaluation
-
-Zone : apps/api/, tests/, docs/
-
-- `sprint-3-agent-recovery.md`
+- ~~`sprint-3-agent-recovery.md`~~
+- `sprint-3-validation.md`
 - `sprint-4-evaluation.md`

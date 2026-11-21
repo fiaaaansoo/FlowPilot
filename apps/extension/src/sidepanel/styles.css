@@ -190,6 +190,18 @@ p {
   color: var(--on-accent);
 }
 
+/* Narrow side panel (Chrome's minimum is 320 px): three bold labels do not fit on one row.
+   Record, the main action at rest, takes the full width; Stop and Replay share the next row. */
+@media (max-width: 360px) {
+  .controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .control--record {
+    grid-column: 1 / -1;
+  }
+}
+
 .control svg {
   width: 14px;
   height: 14px;
@@ -508,4 +520,61 @@ p {
 .human-prompt__actions .control {
   flex: 1 1 auto;
   padding: var(--space-2) var(--space-4);
+}
+
+/* --- Récupération IA ---------------------------------------------------- */
+
+.ai-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ai-form label:not(.choice-row) {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-top: var(--space-1);
+}
+
+.ai-form input[type='url'],
+.ai-form input[type='password'],
+.ai-form select {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.ai-form input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.choice-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+}
+
+.ai-form__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.ai-memory {
+  margin-top: var(--space-2);
+}
+
+/* Left-aligned with the section text (the link button's padding only pads its hit area). */
+.ai-memory > .link-button {
+  margin-left: -4px;
+}
+
+.choice-row input {
+  margin: 0;
 }

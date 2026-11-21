@@ -1,7 +1,8 @@
 import { fail, ok, type ElementStep, type PerformResponse } from '@flowpilot/shared';
 import { isDisabled } from '../grounding/dom';
+import { resolveRef } from '../grounding/observe';
 import { waitForTarget } from '../grounding/resolve';
-import { isIrreversibleAction } from '../recorder/classify';
+import { isIrreversibleAction, submissionScope } from '../recorder/classify';
 
 /**
  * Exécution d'une étape dans la page (content script). Seules des actions
@@ -24,18 +25,40 @@ export interface PerformOptions {
 }
 
 export async function performStep(step: ElementStep, options: PerformOptions): Promise<PerformResponse> {
-  const { timeoutMs, confirmed, signal, beforeLeavingAction, doc = document } = options;
+  const { timeoutMs, signal, doc = document } = options;
   const resolved = await waitForTarget(step.target, timeoutMs, doc, 100, signal);
   if (!resolved.ok) return resolved;
   if (signal?.aborted) return fail('NAVIGATION_FAILED', 'Exécution arrêtée.');
-  const { element: el, strategy } = resolved.value;
+  return actOn(resolved.value.element, step, resolved.value.strategy, options);
+}
 
+/**
+ * Executes an AI-recovered step on an element from the latest observation
+ * snapshot. The element is revalidated (`resolveRef`) immediately before acting;
+ * the action and its value are those of the recorded step, never the model's.
+ */
+export function performByRef(
+  step: ElementStep,
+  snapshotId: string,
+  ref: string,
+  options: Omit<PerformOptions, 'timeoutMs'>,
+): PerformResponse {
+  if (options.signal?.aborted) return fail('NAVIGATION_FAILED', 'Exécution arrêtée.');
+  const resolved = resolveRef(snapshotId, ref, options.doc);
+  if (!resolved.ok) return resolved;
+  return actOn(resolved.value, step, 'ai', { ...options, timeoutMs: 0 });
+}
+
+/** Deterministic action on an already resolved element, with effect verification. */
+function actOn(el: Element, step: ElementStep, strategy: string, options: PerformOptions): PerformResponse {
+  const { confirmed, beforeLeavingAction } = options;
   if (step.kind !== 'manualInput' && isDisabled(el)) {
     return fail('TARGET_NOT_INTERACTABLE', 'La cible est désactivée.');
   }
   // Défense en profondeur : l'élément effectivement trouvé est rejugé dans la page.
   // Une action qui paraît irréversible n'est jamais exécutée sans validation humaine.
-  if ((step.kind === 'click' || step.kind === 'submit' || step.kind === 'press') && !confirmed && isIrreversibleAction(el)) {
+  const judged = step.kind === 'press' ? submissionScope(el) : el;
+  if ((step.kind === 'click' || step.kind === 'submit' || step.kind === 'press') && !confirmed && isIrreversibleAction(judged)) {
     return fail('CONFIRMATION_REQUIRED', 'Cette action semble irréversible : confirmation humaine requise.');
   }
   if (el instanceof HTMLElement) el.scrollIntoView({ block: 'center', inline: 'nearest' });

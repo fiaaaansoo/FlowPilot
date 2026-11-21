@@ -1,8 +1,12 @@
 import {
   errorMessage,
   fail,
+  isElementStep,
+  isRecoverable,
   needsHuman,
   type ElementStep,
+  type FlowPilotError,
+  type RecoveryLog,
   type Result,
   type RunSummary,
   type StepLog,
@@ -13,9 +17,17 @@ import {
 /**
  * Moteur d'exécution séquentiel, indépendant de Chrome et de tout LLM.
  * Les effets concrets passent par un `StepDriver` (Chrome en production,
- * faux driver en test). Le Recovery Agent (Sprint 3) s'insérera entre l'échec
- * d'une étape et l'arrêt du run, derrière la même interface.
+ * faux driver en test).
+ *
+ * AI recovery plugs in after a deterministic grounding failure, through the
+ * optional `recover` hook: only for eligible failures (`isRecoverable`), and
+ * the run stays fully functional without it. A recovered step is verified
+ * twice: by the action's own effect check, then by the next step (whose
+ * success or failure is reported back through `reportOutcome`).
  */
+export type StepRecovery =
+  | { ok: true; strategy: string; log: RecoveryLog; recoveryId: string }
+  | { ok: false; error: FlowPilotError; log: RecoveryLog };
 export interface StepDriver {
   navigate(url: string, signal: AbortSignal): Promise<Result<void>>;
   /** Attend que l'onglet atteigne `url` (navigation déclenchée par l'étape précédente). */
@@ -31,6 +43,10 @@ export interface StepDriver {
    * `false` si le run est arrêté entre-temps.
    */
   requestHuman(stepIndex: number, signal: AbortSignal): Promise<boolean>;
+  /** Optional AI recovery; `null` when recovery is disabled or not applicable. */
+  recover?(stepIndex: number, step: ElementStep, failure: FlowPilotError, signal: AbortSignal): Promise<StepRecovery | null>;
+  /** Reports whether a recovered step was confirmed by what happened next. */
+  reportOutcome?(recoveryId: string, verified: boolean, detail: string): void;
 }
 
 export interface RunOptions {
@@ -94,11 +110,19 @@ export async function runWorkflow(workflow: Workflow, driver: StepDriver, option
     return summary('aborted', index);
   };
 
+  /** A recovered step waiting for the next step to confirm it. */
+  let pendingRecovery: { recoveryId: string; stepIndex: number } | null = null;
+  const settleRecovery = (verified: boolean, detail: string) => {
+    if (pendingRecovery) driver.reportOutcome?.(pendingRecovery.recoveryId, verified, detail);
+    pendingRecovery = null;
+  };
+
   for (const [index, step] of workflow.steps.entries()) {
     if (isAborted(signal)) return summary('aborted', index);
     const stepStart = now();
 
     let result: StepResult;
+    let recovery: RecoveryLog | undefined;
     try {
       await onStepStart?.(index);
       if (isAborted(signal)) return abortAt(index, step, stepStart);
@@ -113,19 +137,41 @@ export async function runWorkflow(workflow: Workflow, driver: StepDriver, option
         confirmed = true;
         result = await runHandler(step, driver, signal, confirmed);
       }
+      // Deterministic grounding failed on a recoverable error: try AI recovery, if configured.
+      if (!result.ok && !isAborted(signal) && driver.recover && isElementStep(step) && isRecoverable(result.error.code, step.kind)) {
+        const recovered = await driver.recover(index, step, result.error, signal);
+        if (recovered) {
+          recovery = recovered.log;
+          if (recovered.ok) {
+            result = { ok: true, value: { strategy: recovered.strategy } };
+            settleRecovery(true, `step ${index + 1} succeeded (recovered) after the recovered step`);
+            pendingRecovery = { recoveryId: recovered.recoveryId, stepIndex: index };
+          } else {
+            const reason = recovered.log.reason ? ` Récupération IA : ${recovered.log.reason}.` : '';
+            result = fail(result.error.code, `${result.error.message}${reason}`);
+          }
+        }
+      }
     } catch (error) {
       result = fail('INTERNAL', errorMessage(error));
     }
+    const extra: Partial<StepLog> = recovery ? { recovery } : {};
 
     if (!result.ok) {
       // Un échec provoqué par l'arrêt n'est pas une erreur de l'étape.
-      if (isAborted(signal)) return abortAt(index, step, stepStart);
-      record(index, step, stepStart, { status: 'failed', code: result.error.code, message: result.error.message });
+      if (isAborted(signal)) {
+        record(index, step, stepStart, { status: 'aborted', ...extra });
+        return summary('aborted', index);
+      }
+      settleRecovery(false, `step ${index + 1} failed after the recovered step`);
+      record(index, step, stepStart, { status: 'failed', code: result.error.code, message: result.error.message, ...extra });
       return summary('failed', index, { stepIndex: index, ...result.error });
     }
-    record(index, step, stepStart, result.value.strategy ? { strategy: result.value.strategy } : {});
+    if (pendingRecovery && pendingRecovery.stepIndex < index) settleRecovery(true, `step ${index + 1} succeeded after the recovered step`);
+    record(index, step, stepStart, { ...(result.value.strategy ? { strategy: result.value.strategy } : {}), ...extra });
     if (isAborted(signal)) return summary('aborted', index + 1);
   }
 
+  settleRecovery(true, 'the workflow completed after the recovered step');
   return summary('succeeded', totalSteps);
 }

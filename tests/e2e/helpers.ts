@@ -23,7 +23,7 @@ export async function waitForCapture(serviceWorker: Worker, page: Page): Promise
 
 export async function startRecording(sidePanel: Page, serviceWorker: Worker, page: Page): Promise<void> {
   await page.bringToFront();
-  await sidePanel.getByRole('button', { name: 'Enregistrer' }).click();
+  await sidePanel.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await expect(sidePanel.getByLabel('État de FlowPilot')).toHaveAttribute('data-status', 'recording');
   await waitForCapture(serviceWorker, page);
 }
@@ -50,4 +50,35 @@ export function dumpStorage(serviceWorker: Worker): Promise<string> {
   return serviceWorker.evaluate(async () =>
     JSON.stringify([await chrome.storage.local.get(null), await chrome.storage.session.get(null)]),
   );
+}
+
+/** Points the extension at the e2e recovery backend (mock provider) and enables AI recovery. */
+export async function enableAiRecovery(serviceWorker: Worker, port: number, token: string, enabled = true): Promise<void> {
+  await serviceWorker.evaluate(
+    async ({ port: p, token: t, enabled: e }) => {
+      await chrome.storage.local.set({
+        'flowpilot.ai': { enabled: e, endpoint: `http://127.0.0.1:${p}`, token: t, mode: 'auto-when-safe' },
+      });
+    },
+    { port, token, enabled },
+  );
+}
+
+/** Calls the e2e backend directly (memory reset, metrics). */
+export async function backendCall(port: number, token: string, path: string, method = 'GET'): Promise<unknown> {
+  const response = await fetch(`http://127.0.0.1:${port}${path}`, { method, headers: { Authorization: `Bearer ${token}` } });
+  return response.json() as Promise<unknown>;
+}
+
+/** Selects a demo-site interface variation (persisted by the site in localStorage). */
+export async function setVariant(page: Page, variant: string): Promise<void> {
+  await page.goto(`/?variante=${variant}`);
+}
+
+/** Latest run summary stored by the extension. */
+export function latestRun(serviceWorker: Worker): Promise<Record<string, unknown> | undefined> {
+  return serviceWorker.evaluate(async () => {
+    const runs = (await chrome.storage.local.get('flowpilot.runs'))['flowpilot.runs'] as Record<string, unknown>[] | undefined;
+    return runs?.[0];
+  });
 }

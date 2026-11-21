@@ -44,3 +44,13 @@ Thumbs.db
 playwright-report/
 test-results/
 coverage/
+
+# FlowPilot backend
+apps/api/.venv/
+apps/api/.data/
+apps/api/*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Benchmark output
+bench-results/

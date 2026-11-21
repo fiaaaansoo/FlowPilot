@@ -1,0 +1,6 @@
+{
+  "contract": "flowpilot.recovery/v1",
+  "verified": true,
+  "detail": "Step 5 and step 6 succeeded after recovery.",
+  "correctedTarget": { "ref": "e2", "tag": "button", "role": "button", "name": "Trouver des offres", "section": "Rechercher une offre", "attributes": { "type": "submit" } }
+}

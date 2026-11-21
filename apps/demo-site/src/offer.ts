@@ -1,3 +1,4 @@
+import { applyVariant } from './variants';
 import { JOBS } from './jobs';
 
 const params = new URLSearchParams(location.search);
@@ -64,3 +65,6 @@ form.addEventListener('submit', (event) => {
   form.hidden = true;
   done.hidden = false;
 });
+
+// Controlled interface variation (tests and benchmarks only; none by default).
+applyVariant();

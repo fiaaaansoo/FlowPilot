@@ -26,9 +26,11 @@ import {
   type ContentPong,
   type PerformResponse,
   type RecordAck,
+  type Observation,
   type PageEvent,
 } from '@flowpilot/shared';
-import { performStep } from '../executor/perform';
+import { performByRef, performStep } from '../executor/perform';
+import { observePage } from '../grounding/observe';
 import { InteractionCapture } from '../recorder/capture';
 
 const capture = new InteractionCapture(document, (event: PageEvent) => {
@@ -39,7 +41,7 @@ const capture = new InteractionCapture(document, (event: PageEvent) => {
   });
 });
 
-type Reply = ContentPong | RecordAck | PerformResponse;
+type Reply = ContentPong | RecordAck | PerformResponse | Observation;
 
 /** Action de replay en cours (attente d'un élément), annulable par `content/cancel`. */
 let currentAction: AbortController | null = null;
@@ -98,5 +100,28 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse: (r
     case 'content/cancel':
       currentAction?.abort();
       return false;
+    case 'content/observe':
+      sendResponse(observePage());
+      return false;
+    case 'content/perform-ref': {
+      const step = parseWorkflowStep(message.step, 0);
+      if (!step.ok || !isElementStep(step.value)) {
+        sendResponse(fail('INVALID_WORKFLOW', 'Étape invalide reçue par la page.'));
+        return false;
+      }
+      let replied = false;
+      const reply = (response: PerformResponse) => {
+        if (replied) return;
+        replied = true;
+        sendResponse(response);
+      };
+      reply(
+        performByRef(step.value, message.snapshotId, message.ref, {
+          confirmed: message.confirmed,
+          beforeLeavingAction: (strategy) => reply(ok({ strategy })),
+        }),
+      );
+      return false;
+    }
   }
 });

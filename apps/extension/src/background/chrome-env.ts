@@ -7,6 +7,8 @@ import {
   originOf,
   originPatternFor,
   parsePerformResponse,
+  parseAiSettings,
+  parseObservation,
   parseRecordAck,
   urlMatches,
   type ContentPong,
@@ -14,6 +16,7 @@ import {
   type Result,
   type SessionStatus,
 } from '@flowpilot/shared';
+import { AI_SETTINGS_KEY } from '../storage/keys';
 import type { BrowserEnv } from './controller';
 
 /** Délai max d'un chargement de page pendant un replay. */
@@ -132,6 +135,35 @@ export const chromeEnv: BrowserEnv = {
     const result = await raceAbort(response, signal);
     signal.removeEventListener('abort', cancel);
     return result;
+  },
+
+  async observe(tabId) {
+    const connected = await chromeEnv.connectContent(tabId);
+    if (!connected.ok) return connected;
+    const request: ContentRequest = { type: 'content/observe' };
+    try {
+      const observation = parseObservation(await chrome.tabs.sendMessage(tabId, request));
+      return observation ? ok(observation) : fail('CONTENT_UNREACHABLE', 'Observation invalide renvoyée par la page.');
+    } catch (error) {
+      return fail('CONTENT_UNREACHABLE', `La page ne répond plus : ${errorMessage(error)}`);
+    }
+  },
+
+  async performRef(tabId, step, snapshotId, ref, confirmed, signal) {
+    if (signal.aborted) return fail('NAVIGATION_FAILED', ABORTED_MESSAGE);
+    // No re-injection here: a new content script would have no snapshot, so the proposal would be stale anyway.
+    const request: ContentRequest = { type: 'content/perform-ref', step, snapshotId, ref, confirmed };
+    try {
+      const response = parsePerformResponse(await chrome.tabs.sendMessage(tabId, request));
+      return response ?? fail('CONTENT_UNREACHABLE', 'Réponse inattendue du content script.');
+    } catch (error) {
+      return fail('CONTENT_UNREACHABLE', `La page ne répond plus : ${errorMessage(error)}`);
+    }
+  },
+
+  async loadAiSettings() {
+    const items = await chrome.storage.local.get(AI_SETTINGS_KEY);
+    return parseAiSettings(items[AI_SETTINGS_KEY]);
   },
 
   async setIndicator(status) {

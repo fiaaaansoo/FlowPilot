@@ -32,6 +32,18 @@ export interface ReplayingSession {
   stepIndex: number;
   /** Présent quand le replay attend une intervention humaine sur l'étape `stepIndex`. */
   awaitingHuman?: true;
+  /** Set when the pending human decision is about an AI recovery proposal. */
+  humanPrompt?: AiProposalPrompt;
+}
+
+/** What the side panel shows before executing an AI-recovered step. Texts come from the page or the model: display only. */
+export interface AiProposalPrompt {
+  kind: 'ai-proposal';
+  /** Description of the proposed element (e.g. « Trouver des offres » (button)). */
+  proposed: string;
+  strategy: 'memory' | 'semantic' | 'llm' | 'none';
+  confidence: number;
+  rationale: string;
 }
 
 export type SessionState = IdleSession | RecordingSession | ReplayingSession;
@@ -41,7 +53,7 @@ export type SessionEvent =
   | { type: 'RECORD_STARTED'; tabId: number; origin: string; workflowId: string; startedAt: number }
   | { type: 'REPLAY_STARTED'; tabId: number; workflowId: string; startedAt: number }
   | { type: 'STEP_STARTED'; stepIndex: number }
-  | { type: 'HUMAN_REQUESTED'; stepIndex: number }
+  | { type: 'HUMAN_REQUESTED'; stepIndex: number; prompt?: AiProposalPrompt }
   | { type: 'HUMAN_RESOLVED' }
   | { type: 'STOPPED' }
   | { type: 'REPLAY_FINISHED' };
@@ -73,7 +85,7 @@ export function transition(state: SessionState, event: SessionEvent): Result<Ses
       return ok(replaying(state, event.stepIndex, false));
     case 'HUMAN_REQUESTED':
       if (state.status !== 'replaying' || state.awaitingHuman) return invalid(state, event);
-      return ok(replaying(state, event.stepIndex, true));
+      return ok(replaying(state, event.stepIndex, true, event.prompt));
     case 'HUMAN_RESOLVED':
       if (state.status !== 'replaying' || !state.awaitingHuman) return invalid(state, event);
       return ok(replaying(state, state.stepIndex, false));
@@ -86,9 +98,25 @@ export function transition(state: SessionState, event: SessionEvent): Result<Ses
   }
 }
 
-function replaying(state: ReplayingSession, stepIndex: number, awaitingHuman: boolean): ReplayingSession {
+function replaying(state: ReplayingSession, stepIndex: number, awaitingHuman: boolean, prompt?: AiProposalPrompt): ReplayingSession {
   const { status, tabId, workflowId, startedAt } = state;
-  return { status, tabId, workflowId, startedAt, stepIndex, ...(awaitingHuman ? { awaitingHuman: true as const } : {}) };
+  return {
+    status,
+    tabId,
+    workflowId,
+    startedAt,
+    stepIndex,
+    ...(awaitingHuman ? { awaitingHuman: true as const } : {}),
+    ...(awaitingHuman && prompt ? { humanPrompt: prompt } : {}),
+  };
+}
+
+function parsePrompt(raw: unknown): AiProposalPrompt | undefined {
+  if (!isRecord(raw) || raw.kind !== 'ai-proposal') return undefined;
+  const { proposed, strategy, confidence, rationale } = raw;
+  if (typeof proposed !== 'string' || typeof rationale !== 'string' || !isNum(confidence)) return undefined;
+  if (strategy !== 'memory' && strategy !== 'semantic' && strategy !== 'llm' && strategy !== 'none') return undefined;
+  return { kind: 'ai-proposal', proposed: proposed.slice(0, 300), strategy, confidence, rationale: rationale.slice(0, 300) };
 }
 
 function invalid(state: SessionState, event: SessionEvent): Result<never> {
@@ -117,6 +145,7 @@ export function parseSession(raw: unknown): SessionState {
   if (s.status === 'recording' && isNum(s.tabId) && isStr(s.origin) && isStr(s.workflowId) && isNum(s.startedAt)) {
     return { status: 'recording', tabId: s.tabId, origin: s.origin, workflowId: s.workflowId, startedAt: s.startedAt };
   }
+  const prompt = parsePrompt(s.humanPrompt);
   if (s.status === 'replaying' && isNum(s.tabId) && isStr(s.workflowId) && isNum(s.startedAt) && isNum(s.stepIndex)) {
     return {
       status: 'replaying',
@@ -125,6 +154,7 @@ export function parseSession(raw: unknown): SessionState {
       startedAt: s.startedAt,
       stepIndex: s.stepIndex,
       ...(s.awaitingHuman === true ? { awaitingHuman: true as const } : {}),
+      ...(s.awaitingHuman === true && prompt ? { humanPrompt: prompt } : {}),
     };
   }
   return IDLE;

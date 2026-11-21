@@ -6,6 +6,7 @@ import { SessionStore } from '../storage/session-store';
 import { WorkflowStore } from '../storage/workflow-store';
 import { FakeEnv, deferred, makeWorkflow, target } from '../test/fakes';
 import { SessionController } from './controller';
+import type { BackendClient } from './recovery';
 
 let env: FakeEnv;
 let sessions: SessionStore;
@@ -22,8 +23,56 @@ function setup(envOptions?: ConstructorParameters<typeof FakeEnv>[0]) {
   runs = new RunStore(local);
   clock = Date.parse('2026-11-21T10:00:00Z');
   let seq = 0;
-  controller = new SessionController({ env, sessions, workflows, runs, now: () => clock, newId: () => `id-${++seq}` });
+  controller = new SessionController({
+    env,
+    sessions,
+    workflows,
+    runs,
+    now: () => clock,
+    newId: () => `id-${++seq}`,
+    createBackend: () => fakeBackend,
+  });
 }
+
+/** Scripted recovery backend: proposes `proposeRef`, records outcome reports. */
+let proposeRef = 'e2';
+let requireConfirmation = false;
+const reported: { id: string; verified: boolean }[] = [];
+const fakeBackend: BackendClient = {
+  propose: (request) =>
+    Promise.resolve(
+      ok({
+        contract: 'flowpilot.recovery/v1',
+        recoveryId: 'rec-1',
+        binding: request.binding,
+        decision: {
+          type: 'propose_target',
+          ref: proposeRef,
+          confidence: 0.9,
+          strategy: 'llm',
+          rationale: 'synonyme',
+          requiresConfirmation: requireConfirmation,
+        },
+        usage: {
+          provider: 'mock',
+          model: 'mock-1',
+          promptVersion: 'recovery-v1',
+          modelCalls: 1,
+          inputTokens: 700,
+          outputTokens: 40,
+          cacheReadTokens: null,
+          cacheWriteTokens: null,
+          latencyMs: 5,
+          estimatedCostUsd: 0,
+          contextElements: 1,
+        },
+      }),
+    ),
+  reportOutcome: (id, report) => {
+    reported.push({ id, verified: report.verified });
+    return Promise.resolve();
+  },
+};
 
 const expectError = (response: CommandResponse, code: string) => {
   expect(response.ok).toBe(false);
@@ -345,3 +394,93 @@ describe('SessionController — suppression et reprise', () => {
     expect(env.indicator).toBe('recording');
   });
 });
+
+describe('SessionController — AI recovery', () => {
+  const flow = () =>
+    makeWorkflow([
+      { id: 's1', kind: 'navigate', url: 'http://localhost:5173/' },
+      { id: 's2', kind: 'click', target: target('Rechercher') },
+      { id: 's3', kind: 'waitForNavigation', url: 'http://localhost:5173/results.html' },
+    ]);
+  const enabled = { enabled: true, endpoint: 'http://127.0.0.1:8787', token: 't'.repeat(32), mode: 'auto-when-safe' as const };
+
+  beforeEach(() => {
+    setup();
+    proposeRef = 'e2';
+    requireConfirmation = false;
+    reported.length = 0;
+    env.performImpl = () => Promise.resolve(fail('TARGET_NOT_FOUND', 'L’élément « Rechercher » est introuvable dans la page.'));
+    env.observation = {
+      snapshotId: 'snap-1',
+      url: 'http://localhost:5173/',
+      title: 'Démo',
+      elements: [{ ref: 'e2', tag: 'button', role: 'button', name: 'Lancer la recherche', attributes: { type: 'submit' } }],
+    };
+  });
+
+  it('is off by default: the failure is reported exactly as without AI', async () => {
+    const id = await seed(flow());
+    await controller.handle({ type: 'replay/start', workflowId: id });
+    await controller.settled();
+    const [run] = await runs.list();
+    expect(run).toMatchObject({ outcome: 'failed', failure: { stepIndex: 1, code: 'TARGET_NOT_FOUND' } });
+    expect(run?.log[1]?.recovery).toBeUndefined();
+    expect(env.refCalls).toEqual([]);
+  });
+
+  it('recovers the step, continues, and reports the outcome once the next step succeeds', async () => {
+    env.aiSettings = enabled;
+    const id = await seed(flow());
+    await controller.handle({ type: 'replay/start', workflowId: id });
+    await controller.settled();
+    const [run] = await runs.list();
+    expect(run).toMatchObject({ outcome: 'succeeded', stepsCompleted: 3 });
+    expect(run?.log[1]).toMatchObject({ status: 'succeeded', strategy: 'ai:llm', recovery: { outcome: 'recovered', modelCalls: 1 } });
+    expect(env.refCalls).toEqual([{ ref: 'e2', confirmed: false }]);
+    expect(reported).toEqual([{ id: 'rec-1', verified: true }]);
+  });
+
+  it('a recovered step followed by a failure is reported as not verified', async () => {
+    env.aiSettings = enabled;
+    env.navigateImpl = (url) => Promise.resolve(url.endsWith('results.html') ? fail('NAVIGATION_FAILED', 'pas de navigation') : ok(undefined));
+    const id = await seed(flow());
+    await controller.handle({ type: 'replay/start', workflowId: id });
+    await controller.settled();
+    expect((await runs.list())[0]).toMatchObject({ outcome: 'failed', failure: { stepIndex: 2 } });
+    expect(reported).toEqual([{ id: 'rec-1', verified: false }]);
+  });
+
+  it('shows the proposal to the user before executing it when confirmation is required', async () => {
+    env.aiSettings = enabled;
+    requireConfirmation = true;
+    const id = await seed(flow());
+    await controller.handle({ type: 'replay/start', workflowId: id });
+    await waitUntil(isAwaiting);
+    expect(await sessions.getSession()).toMatchObject({ awaitingHuman: true, humanPrompt: { kind: 'ai-proposal', strategy: 'llm' } });
+    expect(env.refCalls).toEqual([]);
+    await controller.handle({ type: 'replay/continue', stepIndex: 1 });
+    await controller.settled();
+    expect(env.refCalls).toEqual([{ ref: 'e2', confirmed: true }]);
+    expect((await runs.list())[0]?.outcome).toBe('succeeded');
+  });
+
+  it('two consecutive recovered steps both get their outcome reported', async () => {
+    env.aiSettings = enabled;
+    const id = await seed(
+      makeWorkflow([
+        { id: 's1', kind: 'navigate', url: 'http://localhost:5173/' },
+        { id: 's2', kind: 'click', target: target('Rechercher') },
+        { id: 's3', kind: 'click', target: target('Rechercher encore') },
+        { id: 's4', kind: 'waitForNavigation', url: 'http://localhost:5173/results.html' },
+      ]),
+    );
+    await controller.handle({ type: 'replay/start', workflowId: id });
+    await controller.settled();
+    expect((await runs.list())[0]?.outcome).toBe('succeeded');
+    expect(reported).toEqual([
+      { id: 'rec-1', verified: true },
+      { id: 'rec-1', verified: true },
+    ]);
+  });
+});
+

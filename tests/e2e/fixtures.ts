@@ -19,7 +19,8 @@ function prepareTestExtension(): string {
   cpSync(DIST_DIR, dir, { recursive: true });
   const manifestPath = join(dir, 'manifest.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
-  manifest.host_permissions = ['http://localhost/*'];
+  // localhost: demo site; 127.0.0.1: local recovery backend.
+  manifest.host_permissions = ['http://localhost/*', 'http://127.0.0.1/*'];
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   return dir;
 }

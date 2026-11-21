@@ -1,4 +1,5 @@
 import { describeStep, needsHuman, type RunSummary, type StepLog, type WorkflowStep } from '@flowpilot/shared';
+import { RECOVERY_STRATEGY_LABEL } from '../labels';
 
 interface Props {
   steps: readonly WorkflowStep[];
@@ -18,6 +19,9 @@ const STRATEGY_LABEL: Record<string, string> = {
   text: 'texte',
   combined: 'indices combinés',
   unconfirmed: 'page quittée après l’action',
+  'ai:memory': `récupération IA (${RECOVERY_STRATEGY_LABEL.memory})`,
+  'ai:semantic': `récupération IA (${RECOVERY_STRATEGY_LABEL.semantic})`,
+  'ai:llm': `récupération IA (${RECOVERY_STRATEGY_LABEL.llm})`,
 };
 
 type Status = StepLog['status'] | 'current' | 'pending';
@@ -46,6 +50,17 @@ export function StepList({ steps, run, currentIndex, label }: Props) {
               <span className="step__status">
                 {STATUS_LABEL[status]}
                 {log?.strategy ? `, trouvée par ${STRATEGY_LABEL[log.strategy] ?? log.strategy}` : ''}
+              </span>
+            )}
+            {log?.recovery && log.recovery.outcome !== 'recovered' && (
+              <span className="step__status">
+                récupération IA {log.recovery.outcome === 'unavailable' ? 'indisponible' : 'refusée par prudence'}
+              </span>
+            )}
+            {log?.recovery && log.recovery.modelCalls > 0 && (
+              <span className="step__status">
+                {log.recovery.modelCalls} appel{log.recovery.modelCalls > 1 ? 's' : ''} au modèle,{' '}
+                {log.recovery.inputTokens + log.recovery.outputTokens} tokens, {(log.recovery.latencyMs / 1000).toFixed(1)} s
               </span>
             )}
             {log?.status === 'failed' && log.message && <span className="step__error">{log.message}</span>}

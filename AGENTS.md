@@ -1,90 +1,110 @@
 # AGENTS.md — FlowPilot
 
-Invariants et carte du dépôt pour tout agent (Claude Code ou autre) travaillant sur ce projet.
+Invariants and repository map for any agent (Claude Code or other) working on this project.
 
 ## Stack
 
-Vérifiée depuis les `package.json` (Sprint 1) :
+Verified from the `package.json` and `apps/api/pyproject.toml` files (Sprint 3):
 
-- Monorepo **npm workspaces** : `packages/shared`, `apps/extension`, `apps/demo-site`. pnpm n'est pas utilisé.
-- **TypeScript 6.0** strict (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`). Pas de TS 7 : typescript-eslint 8 exige `<6.1`.
-- Extension : **Chrome Manifest V3**, **React 19**, **Vite 8** (rolldown), `@types/chrome`.
-- Site de démo : Vite multi-pages, TypeScript sans framework.
-- Tests : **Vitest 5** (node + jsdom, Testing Library), **Playwright 1.65** (Chromium avec l'extension chargée).
-- Lint : **ESLint 10** + typescript-eslint `strictTypeChecked` + react-hooks.
-- Backend Python (FastAPI, Pydantic, Ruff, Pytest) : **pas encore créé**, prévu au Sprint 3 dans `apps/api/`.
+- **npm workspaces** monorepo: `packages/shared`, `apps/extension`, `apps/demo-site`. pnpm is not used.
+- Strict **TypeScript 6.0** (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`). No TS 7: typescript-eslint 8 requires `<6.1`.
+- Extension: **Chrome Manifest V3**, **React 19**, **Vite 8** (rolldown), `@types/chrome`.
+- Demo site: multi-page Vite, TypeScript without a framework.
+- Tests: **Vitest 5** (node + jsdom, Testing Library), **Playwright 1.65** (Chromium with the extension loaded).
+- Lint: **ESLint 10** + typescript-eslint `strictTypeChecked` + react-hooks.
+- Optional recovery backend `apps/api/`: **Python 3.11+**, FastAPI, Pydantic 2, uvicorn, httpx, SQLite (standard library); optional `anthropic` SDK extra; Ruff + Pytest. Not an npm workspace: it has its own virtualenv (`apps/api/.venv`).
 
 ## Repository map
 
 ```text
-apps/extension/            Extension Chrome MV3
-  manifest.json            Source du manifest (version injectée au build ; aucun host_permissions, vérifié par manifest.test.ts)
-  vite.config.ts           Build Side Panel + service worker (ESM), plugins manifest et content script, config Vitest
-  vite.content.config.ts   Build du content script en IIFE, lancé par le plugin après chaque build principal (watch compris)
-  src/background/          index.ts (écouteurs Chrome, provenance des messages), controller.ts (SessionController, seul écrivain),
-                           chrome-env.ts (adaptateur chrome.* : injection, capture, navigation, actions)
-  src/content/             Content script : routeur de messages (ping, record, perform), hello au chargement
-  src/recorder/            capture.ts (gestes réels dans la page), classify.ts (champs sensibles, actions irréversibles),
-                           recorder.ts (brouillon côté SW)
-  src/grounding/           dom.ts (rôle, nom accessible, visibilité, attributs stables, CSS unique), resolve.ts (résolution sans ambiguïté)
-  src/executor/            executor.ts (runWorkflow, StepDriver, journal), perform.ts (actions DOM dans la page)
-  src/sidepanel/           UI React : App, components/ (StepList, HumanPrompt…), api.ts (frontière Chrome), usePanelState.ts
-  src/storage/             KeyValueArea, SessionStore (session, brouillon), WorkflowStore, RunStore (historique)
-  src/test/                setup Vitest, FakeEnv, fabriques de workflows
-apps/demo-site/            Site d'emploi fictif, port fixe 5173 (index → results → offer, spa.html = SPA pushState)
-packages/shared/src/       messages (protocole), session (machine d'état), workflow (schéma v2, migration, describeStep),
-                           recording (événements, compileSteps), run (journal), origin, result, guards
-tests/e2e/                 Playwright : fixtures (copie de dist/ + localhost accordé, chargement dans Chromium), specs
-docs/architecture.md       Décisions d'architecture et limites connues
-crew/                      Suivi des tâches (source unique)
+apps/extension/            Chrome MV3 extension
+  manifest.json            Manifest source (version injected at build; no host_permissions, verified by manifest.test.ts)
+  vite.config.ts           Side Panel + service worker build (ESM), manifest and content script plugins, Vitest config
+  vite.content.config.ts   Content script build as IIFE, launched by the plugin after each main build (watch included)
+  src/background/          index.ts (Chrome listeners, message provenance), controller.ts (SessionController, sole writer),
+                           chrome-env.ts (chrome.* adapter: injection, capture, navigation, actions)
+  src/content/             Content script: message router (ping, record, perform), hello on load
+  src/recorder/            capture.ts (real gestures in the page), classify.ts (sensitive fields, irreversible actions),
+                           recorder.ts (draft on the SW side)
+  src/grounding/           dom.ts (role, accessible name, visibility, stable attributes, unique CSS), resolve.ts (unambiguous resolution),
+                           observe.ts (bounded page observation for AI recovery, snapshot refs, resolveRef)
+  src/executor/            executor.ts (runWorkflow, StepDriver, recover hook, log), perform.ts (DOM actions, performByRef)
+  src/background/recovery.ts  Backend client, gateway validation of proposals, per-run budgets, outcome reports
+  src/sidepanel/           React UI: App, components/ (StepList, HumanPrompt…), api.ts (Chrome boundary), usePanelState.ts
+  src/storage/             KeyValueArea, SessionStore (session, draft), WorkflowStore, RunStore (history)
+  src/test/                Vitest setup, FakeEnv, workflow factories
+apps/demo-site/            Fictional job board, fixed port 5173 (index → results → offer, spa.html = pushState SPA),
+                           src/variants.ts = controlled interface changes (?variante=…)
+apps/api/flowpilot_api/    Recovery service: app.py (routes, auth, CORS), agent.py (state machine), grounding.py,
+                           context_builder.py, contracts.py (Pydantic, flowpilot.recovery/v1), providers/ (ollama,
+                           openai_compat, anthropic_api, mock), prompts/ (versioned), store.py (SQLite), config.py, pricing.py
+apps/api/tests/            Pytest (providers mocked with httpx.MockTransport / fakes)
+packages/shared/src/       messages (protocol), session (state machine), workflow (schema v2, migration, describeStep),
+                           recording (events, compileSteps), run (log, recovery log), recovery (contract, AI settings),
+                           origin, result, guards
+tests/e2e/                 Playwright: fixtures (copy of dist/ + localhost/127.0.0.1 granted, loading in Chromium), specs
+tests/benchmark/           Recovery benchmark (own Playwright config, starts one backend per mode)
+tests/contracts/           JSON fixtures of the recovery contract, read by both Vitest and Pytest
+docs/architecture.md       Architecture decisions and known limitations
+docs/recovery.md, docs/adr/, docs/benchmarks/   AI recovery design, ADRs, benchmark method and results
+crew/                      Task tracking (single source of truth)
 ```
 
 ## Verified commands
 
-Toutes exécutées avec succès le 2026-11-21 (Node 24.14, Windows 11) :
+All run successfully on 2026-11-21 (Node 24.14, Windows 11):
 
 ```bash
-npm install                     # installation des workspaces
-npm run dev:demo                # site de démo, http://localhost:5173
-npm run dev:extension           # rebuild continu de apps/extension/dist
+npm install                     # install the workspaces
+npm run dev:demo                # demo site, http://localhost:5173
+npm run dev:extension           # continuous rebuild of apps/extension/dist
 npm run lint                    # ESLint
-npm run typecheck               # tsc racine + workspaces
-npm test                        # Vitest, 248 tests
-npx playwright install chromium # une fois, navigateur des tests e2e
-npm run test:e2e                # build de l'extension + Playwright, 15 tests
+npm run typecheck               # tsc root + workspaces
+npm test                        # Vitest, 294 tests
+npx playwright install chromium # once, browser for the e2e tests
+npm run test:e2e                # extension build + Playwright (+ backend, mock provider), 22 tests
 npm run build                   # apps/extension/dist + apps/demo-site/dist
-npm run check                   # lint + typecheck + test + build (= job CI "check")
+npm run check                   # lint + typecheck + test + build (= CI job "check")
+npm run bench                   # recovery benchmark (FLOWPILOT_BENCH_OLLAMA_MODEL=qwen2.5:3b for the local model)
+
+cd apps/api                     # backend (Python 3.11+; verified with 3.14)
+python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev,anthropic]"
+.venv/Scripts/python -m ruff check . && .venv/Scripts/python -m ruff format --check .
+.venv/Scripts/python -m pytest  # 69 tests, no model, no network
+.venv/Scripts/python -m flowpilot_api serve   # needs FLOWPILOT_API_TOKEN (see apps/api/.env.example)
 ```
 
 ## Code rules
 
-- **Le service worker est le seul écrivain de la session.** Le Side Panel envoie des `Command` (`packages/shared/src/messages.ts`) et lit le stockage. Toute nouvelle action = nouvelle `Command` + garde `isCommand` + cas dans `SessionController.handle`.
-- Toute transition passe par `transition()` (`packages/shared/src/session.ts`). Pas de `setSession` avec un état construit à la main.
-- **Toute donnée externe est `unknown` et validée** : messages Chrome, stockage, réponses du content script. Un schéma de workflow modifié = incrément de `WORKFLOW_SCHEMA_VERSION` + migration explicite, jamais de lecture permissive.
-- Erreurs attendues = `Result` avec un `ErrorCode` et un message français affichable. Les exceptions sont réservées à l'inattendu.
-- `chrome.*` n'apparaît que dans `background/index.ts`, `background/chrome-env.ts`, `content/`, `sidepanel/api.ts` et `storage/area.ts`. La logique reste testable sans navigateur.
-- Le content script reste un script classique autonome : pas d'import dynamique ni de dépendance qui romprait le bundle IIFE. Pas de drapeau global d'idempotence : `connectContent` pingue d'abord et n'injecte que si personne ne répond.
-- Validation des `unknown` : utiliser les gardes de `packages/shared/src/guards.ts` (`isRecord`, `isNonEmptyString`, `isFiniteNumber`), pas de garde locale.
-- Nouveau type d'étape : l'étendre dans `WorkflowStep`, dans `parseWorkflowStep`, dans `describeStep` et dans `HANDLERS` (executor) ; une étape d'interaction a aussi son cas dans `performStep`. La compilation échoue si un handler manque.
-- Capture : n'accepter que des événements `isTrusted` ; la valeur d'un champ sensible (`isSensitiveField`) ne doit jamais être lue ni envoyée, elle devient une étape `manualInput`.
-- Grounding : ne jamais choisir arbitrairement parmi plusieurs candidats ; une ambiguïté est une erreur typée (`TARGET_AMBIGUOUS`), traitée plus tard par le Recovery Agent. Les indices fragiles (CSS positionnel, texte) ne départagent jamais des candidats forts.
-- URL : toujours passer par `sanitizeUrl` avant de stocker, et par `urlMatches` pour comparer.
-- Toute action qui peut être irréversible doit passer par `requestHuman` au replay (`confirm: true` ou `manualInput`).
-- Pages de l'extension : Chrome injecte une feuille par défaut (`body { font-size: 75% }`). La typographie se déclare sur `body`.
-- Pas de `console.log` de debug commité. `console.error` préfixé `[FlowPilot]` pour les erreurs inattendues.
+- **The service worker is the sole writer of the session.** The Side Panel sends `Command`s (`packages/shared/src/messages.ts`) and reads storage. Any new action = new `Command` + `isCommand` guard + case in `SessionController.handle`.
+- Every transition goes through `transition()` (`packages/shared/src/session.ts`). No `setSession` with a hand-built state.
+- **All external data is `unknown` and validated**: Chrome messages, storage, content script responses. A modified workflow schema = increment of `WORKFLOW_SCHEMA_VERSION` + explicit migration, never a permissive read.
+- Expected errors = `Result` with an `ErrorCode` and a displayable French message. Exceptions are reserved for the unexpected.
+- `chrome.*` appears only in `background/index.ts`, `background/chrome-env.ts`, `content/`, `sidepanel/api.ts` and `storage/area.ts`. Logic stays testable without a browser.
+- The content script remains a standalone classic script: no dynamic import or dependency that would break the IIFE bundle. No global idempotence flag: `connectContent` pings first and only injects if nobody answers.
+- Validation of `unknown` values: use the guards in `packages/shared/src/guards.ts` (`isRecord`, `isNonEmptyString`, `isFiniteNumber`), no local guard.
+- New step type: extend it in `WorkflowStep`, in `parseWorkflowStep`, in `describeStep` and in `HANDLERS` (executor); an interaction step also has its case in `performStep`. Compilation fails if a handler is missing.
+- Capture: accept only `isTrusted` events; the value of a sensitive field (`isSensitiveField`) must never be read or sent, it becomes a `manualInput` step.
+- Grounding: never pick arbitrarily among several candidates; an ambiguity is a typed error (`TARGET_AMBIGUOUS`), handled later by the Recovery Agent. Fragile cues (positional CSS, text) never break ties between strong candidates.
+- URLs: always go through `sanitizeUrl` before storing, and through `urlMatches` to compare.
+- Any action that may be irreversible must go through `requestHuman` at replay (`confirm: true` or `manualInput`).
+- AI recovery: the model only selects an observed `ref`; the action and value always come from the recorded step. Every proposal is revalidated in the service worker (`validateProposal`) and in the page (`resolveRef`) before acting. Never add a tool that executes code, navigates, or types model-provided text. Recovery only for `isRecoverable` failures; no provider fallback; a contract change = new fixtures in `tests/contracts/` + both parsers.
+- Extension pages: Chrome injects a default stylesheet (`body { font-size: 75% }`). Typography is declared on `body`.
+- No debug `console.log` committed. `console.error` prefixed `[FlowPilot]` for unexpected errors.
 
 ## Secrets and boundaries
 
-- Aucun secret aux Sprints 1-2 : pas de backend, pas de clé d'API.
-- Jamais collectés ni stockés : mots de passe, cookies, jetons, données de paiement, contenu des champs sensibles.
-- Permissions : `sidePanel`, `storage`, `scripting` + `optional_host_permissions` par domaine. **Toute nouvelle permission doit être justifiée dans `docs/architecture.md`.** `<all_urls>`, `tabs`, `webRequest` et `cookies` sont exclus sans décision explicite.
-- Le contenu des pages web est une donnée non fiable : jamais exécuté, jamais interprété comme une instruction.
-- Détails : `SECURITY.md`.
+- The only secrets are backend-side: `FLOWPILOT_API_TOKEN` (shared with the extension through the Side Panel) and optional provider keys (`ANTHROPIC_API_KEY`, `FLOWPILOT_OPENAI_API_KEY`) in `apps/api/.env`, which is git-ignored. Tests use fixed fake tokens only.
+- Never collected or stored: passwords, cookies, tokens, payment data, content of sensitive fields.
+- Permissions: `sidePanel`, `storage`, `scripting` + per-domain `optional_host_permissions`. **Any new permission must be justified in `docs/architecture.md`.** `<all_urls>`, `tabs`, `webRequest` and `cookies` are excluded without an explicit decision.
+- Web page content is untrusted data: never executed, never interpreted as an instruction.
+- Details: `SECURITY.md`.
 
 ## Documentation routing
 
-- Vision produit / périmètre : `PRODUCT.md`.
-- Conventions de contribution : `CONTRIBUTING.md`.
-- Limites de sécurité : `SECURITY.md`.
-- Architecture et décisions : `docs/architecture.md`.
-- Guide de contexte global : `crew/CLAUDE_CONTEXT/AGENTS.md`.
+- Product vision / scope: `PRODUCT.md`.
+- Contribution conventions: `CONTRIBUTING.md`.
+- Security boundaries: `SECURITY.md`.
+- Architecture and decisions: `docs/architecture.md`, ADRs in `docs/adr/`.
+- AI recovery design and threat model: `docs/recovery.md`; backend setup: `apps/api/README.md`.
+- Global context guide: `crew/CLAUDE_CONTEXT/AGENTS.md`.

@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', 'playwright-report/**', 'test-results/**', 'graphify-out/**'],
+    ignores: ['**/dist/**', '**/node_modules/**', 'apps/api/**', 'playwright-report/**', 'test-results/**', 'graphify-out/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
@@ -47,7 +47,7 @@ export default tseslint.config(
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['**/*.{js,mjs}', '**/vite*.config.ts', 'vitest.config.ts', 'playwright.config.ts', 'tests/**/*.ts'],
+    files: ['**/*.{js,mjs}', '**/vite*.config.ts', 'vitest.config.ts', 'playwright*.config.ts', 'tests/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
   {

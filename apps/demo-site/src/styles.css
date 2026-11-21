@@ -209,3 +209,10 @@ button.link {
   text-decoration: underline;
   cursor: pointer;
 }
+
+.injected {
+  padding: 8px;
+  border: 1px dashed #b3261e;
+  color: #b3261e;
+  font-size: 0.9rem;
+}

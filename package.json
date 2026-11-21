@@ -22,7 +22,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build -w @flowpilot/extension && playwright test",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "bench": "npm run build -w @flowpilot/extension && playwright test -c playwright.benchmark.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

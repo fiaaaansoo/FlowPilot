@@ -10,6 +10,27 @@ import type { StepKind } from './workflow.js';
 export type RunOutcome = 'succeeded' | 'aborted' | 'failed';
 export type StepStatus = 'succeeded' | 'failed' | 'aborted';
 
+/** What AI recovery did for a step whose deterministic grounding failed. */
+export interface RecoveryLog {
+  /** recovered: executed and checked; escalated: refused safely; unavailable: no backend; aborted: stopped by the user. */
+  outcome: 'recovered' | 'escalated' | 'unavailable' | 'aborted';
+  strategy?: 'memory' | 'semantic' | 'llm' | 'none';
+  attempts: number;
+  modelCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  /** Whole recovery as seen by the extension, including any wait for the user's confirmation. */
+  latencyMs: number;
+  /** Time spent in the recovery service (memory, grounding and model inference), without the user's wait. */
+  serviceLatencyMs?: number;
+  costUsd: number;
+  provider?: string;
+  model?: string;
+  recoveryId?: string;
+  reason?: string;
+}
+
 export interface StepLog {
   stepIndex: number;
   kind: StepKind;
@@ -21,6 +42,8 @@ export interface StepLog {
   /** Renseignés en cas d'échec. */
   code?: ErrorCode;
   message?: string;
+  /** Present when AI recovery was attempted for this step. */
+  recovery?: RecoveryLog;
 }
 
 export interface RunSummary {
@@ -48,6 +71,22 @@ export function failedRun(
 const OUTCOMES: ReadonlySet<unknown> = new Set<RunOutcome>(['succeeded', 'aborted', 'failed']);
 const STEP_STATUSES: ReadonlySet<unknown> = new Set<StepStatus>(['succeeded', 'failed', 'aborted']);
 
+const RECOVERY_OUTCOMES: ReadonlySet<unknown> = new Set(['recovered', 'escalated', 'unavailable', 'aborted']);
+
+function isRecoveryLog(raw: unknown): raw is RecoveryLog {
+  return (
+    isRecord(raw) &&
+    RECOVERY_OUTCOMES.has(raw.outcome) &&
+    isFiniteNumber(raw.attempts) &&
+    isFiniteNumber(raw.modelCalls) &&
+    isFiniteNumber(raw.inputTokens) &&
+    isFiniteNumber(raw.outputTokens) &&
+    isFiniteNumber(raw.latencyMs) &&
+    (raw.serviceLatencyMs === undefined || isFiniteNumber(raw.serviceLatencyMs)) &&
+    isFiniteNumber(raw.costUsd)
+  );
+}
+
 function isStepLog(raw: unknown): raw is StepLog {
   return (
     isRecord(raw) &&
@@ -58,7 +97,8 @@ function isStepLog(raw: unknown): raw is StepLog {
     isFiniteNumber(raw.finishedAt) &&
     (raw.strategy === undefined || typeof raw.strategy === 'string') &&
     (raw.code === undefined || typeof raw.code === 'string') &&
-    (raw.message === undefined || typeof raw.message === 'string')
+    (raw.message === undefined || typeof raw.message === 'string') &&
+    (raw.recovery === undefined || isRecoveryLog(raw.recovery))
   );
 }
 
