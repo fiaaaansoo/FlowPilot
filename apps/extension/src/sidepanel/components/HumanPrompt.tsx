@@ -31,6 +31,7 @@ export function HumanPrompt({ step, prompt, busy, onContinue, onStop }: Props) {
             {describeStep(step)} : l’élément enregistré a changé. FlowPilot propose {proposal.proposed} (
             {RECOVERY_STRATEGY_LABEL[proposal.strategy]}, confiance {Math.round(proposal.confidence * 100)} %).
           </p>
+          {proposal.warning && <p className="human-prompt__warning">Attention : {proposal.warning}</p>}
           {proposal.rationale && <p className="note">Justification du modèle, non vérifiée : {proposal.rationale}</p>}
         </div>
       ) : (

@@ -44,6 +44,8 @@ export interface AiProposalPrompt {
   strategy: 'memory' | 'semantic' | 'llm' | 'none';
   confidence: number;
   rationale: string;
+  /** Why the user must decide, from the extension or the page (irreversible, data sent elsewhere). Never from the model. */
+  warning?: string;
 }
 
 /** Why a plain confirmation is needed, when it is not just "this step may be irreversible". */
@@ -125,10 +127,12 @@ function parsePrompt(raw: unknown): HumanPromptInfo | undefined {
     return { kind: 'warning', message: raw.message.slice(0, 300) };
   }
   if (!isRecord(raw) || raw.kind !== 'ai-proposal') return undefined;
-  const { proposed, strategy, confidence, rationale } = raw;
+  const { proposed, strategy, confidence, rationale, warning } = raw;
   if (typeof proposed !== 'string' || typeof rationale !== 'string' || !isNum(confidence)) return undefined;
   if (strategy !== 'memory' && strategy !== 'semantic' && strategy !== 'llm' && strategy !== 'none') return undefined;
-  return { kind: 'ai-proposal', proposed: proposed.slice(0, 300), strategy, confidence, rationale: rationale.slice(0, 300) };
+  const prompt: AiProposalPrompt = { kind: 'ai-proposal', proposed: proposed.slice(0, 300), strategy, confidence, rationale: rationale.slice(0, 300) };
+  if (typeof warning === 'string' && warning) prompt.warning = warning.slice(0, 300);
+  return prompt;
 }
 
 function invalid(state: SessionState, event: SessionEvent): Result<never> {

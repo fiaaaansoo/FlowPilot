@@ -285,6 +285,26 @@ describe('Side Panel', () => {
     const dialog = await screen.findByRole('alertdialog', { name: 'Proposition de l’IA à confirmer' });
     expect(dialog).toHaveTextContent('FlowPilot propose « Trouver des offres » (button) (modèle de langage, confiance 62 %)');
     expect(dialog).toHaveTextContent('Justification du modèle, non vérifiée : synonyme');
+    expect(dialog).not.toHaveTextContent('Attention');
+  });
+
+  it('shows why an AI proposal needs confirmation, before the model rationale', async () => {
+    const flow = { schemaVersion: 2, id: 'wf-1', name: 'Recherche', origin: 'http://localhost:5173', createdAt: '2026-11-21T10:00:00.000Z', steps: [{ id: 's1', kind: 'navigate', url: 'http://localhost:5173/' }, { id: 's2', kind: 'click', target: { tag: 'button', role: 'button', name: 'Rechercher', attributes: {}, css: 'button' } }] };
+    const fake = fakeApi({
+      session: {
+        status: 'replaying',
+        tabId: 1,
+        workflowId: 'wf-1',
+        startedAt: 1,
+        stepIndex: 1,
+        awaitingHuman: true,
+        humanPrompt: { kind: 'ai-proposal', proposed: '« Envoyer » (button)', strategy: 'llm', confidence: 0.9, rationale: 'sans risque', warning: 'Ce formulaire envoie des données vers un autre site.' },
+      },
+      workflows: { workflows: [flow], invalidCount: 0 },
+    });
+    render(<App api={fake.api} />);
+    const dialog = await screen.findByRole('alertdialog', { name: 'Proposition de l’IA à confirmer' });
+    expect(dialog).toHaveTextContent('Attention : Ce formulaire envoie des données vers un autre site.');
   });
 
   it('explains a page-side confirmation, such as data sent to another site', async () => {

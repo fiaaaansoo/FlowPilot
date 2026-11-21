@@ -270,6 +270,15 @@ describe('recoverStep', () => {
     expect(result.ok).toBe(true);
     expect(calls.map((c) => c.confirmed)).toEqual([false, true]);
     expect(requestHuman).toHaveBeenCalledOnce();
+    // The user is told why the page asks, not only what the model proposes.
+    expect(requestHuman).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ai-proposal', warning: 'irréversible' }));
+  });
+
+  it('an irreversible proposal says so in the prompt', async () => {
+    const { recoveryEnv } = env([{ ...BUTTON, irreversible: true }, LINK_OUT, FIELD]);
+    const requestHuman = vi.fn(() => Promise.resolve(true));
+    await recoverStep(recoveryEnv, backend(propose('e2')).client, context({ requestHuman }));
+    expect(requestHuman).toHaveBeenCalledWith(expect.objectContaining({ warning: expect.stringContaining('irréversible') as string }));
   });
 
   it('enforces the per-run recovery budget', async () => {

@@ -86,6 +86,13 @@ describe('availableCommands', () => {
 });
 
 describe('parseSession', () => {
+  it('keeps the warning of an AI proposal, bounded, and drops a malformed one', () => {
+    const prompt = { kind: 'ai-proposal', proposed: '« Envoyer »', strategy: 'llm', confidence: 0.9, rationale: 'r' };
+    const awaiting = { ...replaying, awaitingHuman: true };
+    expect(parseSession({ ...awaiting, humanPrompt: { ...prompt, warning: 'x'.repeat(400) } })).toMatchObject({ humanPrompt: { warning: 'x'.repeat(300) } });
+    expect(parseSession({ ...awaiting, humanPrompt: { ...prompt, warning: 42 } })).toEqual({ ...awaiting, humanPrompt: prompt });
+  });
+
   it('relit un état valide', () => {
     expect(parseSession(recording)).toEqual(recording);
     expect(parseSession(replaying)).toEqual(replaying);

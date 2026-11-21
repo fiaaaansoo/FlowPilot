@@ -326,6 +326,7 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
       (strategy !== 'semantic' && ctx.step.kind !== 'click') ||
       (strategy === 'llm' && !sharesIdentity(ctx.step.target, candidate));
     const prompt: AiProposalPrompt = { kind: 'ai-proposal', proposed: candidateLabel(candidate), strategy, confidence, rationale };
+    if (candidate.irreversible === true) prompt.warning = 'Cette action semble irréversible.';
     if (mustConfirm) {
       if (!(await ctx.requestHuman(prompt))) return escalate('aborted', ABORTED, 'refusé par l’utilisateur');
       confirmed = true;
@@ -337,8 +338,8 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
     // EXECUTE + immediate VERIFY (effect checks of the deterministic executor).
     let executed = await env.performRef(ctx.tabId, ctx.step, observation.value.snapshotId, candidate.ref, confirmed, ctx.signal);
     if (!executed.ok && executed.error.code === 'CONFIRMATION_REQUIRED' && !confirmed) {
-      // The page itself judges the element irreversible: ask, then retry once.
-      if (!(await ctx.requestHuman(prompt))) return escalate('aborted', ABORTED, 'refusé par l’utilisateur');
+      // The page itself judges the element irreversible or leaving the site: say why, ask, then retry once.
+      if (!(await ctx.requestHuman({ ...prompt, warning: executed.error.message }))) return escalate('aborted', ABORTED, 'refusé par l’utilisateur');
       executed = await env.performRef(ctx.tabId, ctx.step, observation.value.snapshotId, candidate.ref, true, ctx.signal);
     }
     if (executed.ok) {
