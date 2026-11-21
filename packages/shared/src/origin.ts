@@ -82,22 +82,43 @@ const OAUTH_PAIR = ['code', 'state'] as const;
 const VOLATILE_PARAM = /^(utm_\w+|gclid|fbclid|msclkid|_|cb|ts|timestamp|t|rnd|random|cache|v)$/i;
 
 /**
- * URL (absolute or relative) with every query value removed, keys kept, and a fragment that
- * carries parameters dropped. Used for what is sent to the recovery service: a link may carry
- * credentials under any parameter name (pre-signed URLs, reset links, e-mail addresses).
+ * Short stable digest (two interleaved 32-bit FNV-1a, 16 hex digits). Equal inputs give equal
+ * digests, so masked URLs stay comparable; a high-entropy secret cannot be read back from it.
+ * Not a cryptographic hash: a low-entropy value (a small id) can still be guessed.
  */
-export function withoutQueryValues(url: string): string {
+function digest(value: string): string {
+  let a = 0x811c9dc5;
+  let b = 0xcbf29ce4;
+  for (let i = 0; i < value.length; i += 1) {
+    const c = value.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193);
+    b = Math.imul(b ^ c ^ (a >>> 13), 0x01000193);
+  }
+  return (a >>> 0).toString(16).padStart(8, '0') + (b >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * URL (absolute or relative) with every query value replaced by `~<digest>`, keys kept, a pair
+ * without "=" masked whole, and a fragment that carries parameters dropped. Used for what is sent
+ * to the recovery service: a link may carry credentials under any parameter name (pre-signed
+ * URLs, reset links, e-mail addresses), yet two links must still be told apart.
+ */
+export function maskQueryValues(url: string): string {
   const hashAt = url.indexOf('#');
   const hash = hashAt === -1 ? '' : url.slice(hashAt);
   const rest = hashAt === -1 ? url : url.slice(0, hashAt);
+  const keptHash = hash.includes('=') ? '' : hash;
   const queryAt = rest.indexOf('?');
-  if (queryAt === -1) return rest + (hash.includes('=') ? '' : hash);
-  const keys = rest
+  if (queryAt === -1) return rest + keptHash;
+  const pairs = rest
     .slice(queryAt + 1)
     .split('&')
-    .map((pair) => pair.split('=')[0] ?? '')
-    .filter(Boolean);
-  return rest.slice(0, queryAt) + (keys.length ? `?${keys.join('&')}` : '') + (hash.includes('=') ? '' : hash);
+    .filter(Boolean)
+    .map((pair) => {
+      const eq = pair.indexOf('=');
+      return eq === -1 ? `~${digest(pair)}` : `${pair.slice(0, eq)}=~${digest(pair.slice(eq + 1))}`;
+    });
+  return rest.slice(0, queryAt) + (pairs.length ? `?${pairs.join('&')}` : '') + keptHash;
 }
 
 /**

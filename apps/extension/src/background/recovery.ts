@@ -9,7 +9,7 @@ import {
   originOf,
   parseRecoveryResponse,
   sameBinding,
-  withoutQueryValues,
+  maskQueryValues,
   type AiProposalPrompt,
   type AiSettings,
   type Candidate,
@@ -153,9 +153,9 @@ export function validateProposal(
 /** Human-readable description of a candidate, for the confirmation prompt (untrusted text, display only). */
 const IDENTIFIERS = ['id', 'name', 'data-testid', 'data-test', 'data-qa', 'data-cy', 'href'] as const;
 
-/** Attributes as sent to the recovery service: a link's query values never leave the extension. */
+/** Attributes as sent to the recovery service: a link's query values leave the extension only as digests. */
 function safeAttributes(attributes: Record<string, string>): Record<string, string> {
-  return attributes.href === undefined ? attributes : { ...attributes, href: withoutQueryValues(attributes.href) };
+  return attributes.href === undefined ? attributes : { ...attributes, href: maskQueryValues(attributes.href) };
 }
 
 /** Word stems of a label (accents and case ignored, short words dropped). */
@@ -166,7 +166,7 @@ function stems(text: string | undefined): Set<string> {
 
 /** Does the candidate share a stable identifier or a label word with the recorded element? */
 export function sharesIdentity(target: ElementStep['target'], candidate: Candidate): boolean {
-  // Observed hrefs are sent without query values: compare the recorded one in the same form.
+  // Observed hrefs carry masked query values: compare the recorded one in the same form.
   const recordedAttribute = (key: (typeof IDENTIFIERS)[number]) => (key === 'href' ? safeAttributes(target.attributes).href : target.attributes[key]);
   if (IDENTIFIERS.some((key) => recordedAttribute(key) !== undefined && recordedAttribute(key) === candidate.attributes[key])) return true;
   const recorded = stems(target.name ?? target.text);

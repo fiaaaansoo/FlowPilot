@@ -68,14 +68,14 @@ describe('resolveRef / performByRef', () => {
   it('rejects an element moved to another row or retargeted since the observation (node reused by a re-render)', () => {
     document.body.innerHTML = `
       <ul><li>Alerte A <button>Supprimer</button></li><li>Alerte B <span></span></li></ul>
-      <a href="/aide">Aide</a>`;
+      <a href="/aide?id=1">Aide</a>`;
     const { snapshotId, elements } = observePage(document, ids);
     const remove = elements.find((e) => e.name === 'Supprimer')?.ref ?? '';
     const help = elements.find((e) => e.name === 'Aide')?.ref ?? '';
     const button = document.querySelector('button');
     if (button) document.querySelectorAll('li')[1]?.append(button); // same node, now in row B
     expect(resolveRef(snapshotId, remove)).toMatchObject({ ok: false, error: { code: 'TARGET_NOT_FOUND' } });
-    document.querySelector('a')?.setAttribute('href', 'https://evil.example/');
+    document.querySelector('a')?.setAttribute('href', '/aide?id=2');
     expect(resolveRef(snapshotId, help)).toMatchObject({ ok: false, error: { code: 'TARGET_NOT_FOUND' } });
   });
 
@@ -144,7 +144,16 @@ describe('what leaves the page (security review)', () => {
     expect(sent).not.toContain('4970');
   });
 
-  it('sends link and page URLs without query values', () => {
+  it('a marker on an ancestor also hides the text (page heading, label target)', () => {
+    document.body.innerHTML = `
+      <header data-private><h1>Compte de Jeanne Martin</h1><span id="who">Jeanne</span></header>
+      <main><button aria-labelledby="who">Profil</button><button>Exporter</button></main>`;
+    const sent = JSON.stringify(observePage(document, ids));
+    expect(sent).toContain('Exporter');
+    expect(sent).not.toContain('Jeanne');
+  });
+
+  it('sends link and page URLs with query values masked', () => {
     document.body.innerHTML = `<a href="https://localhost/dl?X-Amz-Signature=s3cr3t&X-Amz-Credential=AKIA">Télécharger</a>`;
     window.history.replaceState(null, '', '/page?email=jeanne%40example.com');
     const observation = observePage(document, ids);
@@ -152,7 +161,7 @@ describe('what leaves the page (security review)', () => {
     expect(sent).not.toContain('s3cr3t');
     expect(sent).not.toContain('AKIA');
     expect(sent).not.toContain('jeanne');
-    expect(observation.elements[0]?.attributes.href).toBe('https://localhost/dl?X-Amz-Signature&X-Amz-Credential');
+    expect(observation.elements[0]?.attributes.href).toMatch(/^https:\/\/localhost\/dl\?X-Amz-Signature=~[0-9a-f]{16}&X-Amz-Credential=~[0-9a-f]{16}$/);
     window.history.replaceState(null, '', '/');
   });
 });

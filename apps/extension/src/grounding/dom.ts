@@ -83,7 +83,7 @@ export function isTypingField(el: Element): boolean {
 
 /** Texte d'un sous-arbre sans le contenu des champs (jamais de valeur saisie) ni des scripts. */
 export function textOf(el: Element): string {
-  if (isTypingField(el) || NO_TEXT.has(el.tagName) || el.matches(SENSITIVE_MARKER)) return '';
+  if (isTypingField(el) || NO_TEXT.has(el.tagName) || el.closest(SENSITIVE_MARKER) !== null) return '';
   let text = '';
   for (const node of Array.from(el.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE) text += node.textContent ?? '';

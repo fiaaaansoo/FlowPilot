@@ -65,7 +65,9 @@ The response is either `propose_target` (`ref`, `confidence`, `strategy`
   of a subtree marked `data-flowpilot-sensitive` / `data-private` / `data-sensitive` is
   never used as a name, a text, a row context or a section label either.
 - The page URL, observed link `href`s and the recorded step's `href` leave the extension
-  with query values dropped (keys kept), so a pre-signed or reset link carries no secret.
+  with every query value replaced by a 64-bit digest (keys kept), so a pre-signed or reset
+  link carries no readable secret while two links still compare as different. The digest is
+  not cryptographic: a low-entropy value (a small id) can be guessed.
 - No full-page HTML is sent or stored.
 - The model selects a `ref` among observed candidates. The action and any value
   always come from the recorded step. There is no tool that runs JavaScript,

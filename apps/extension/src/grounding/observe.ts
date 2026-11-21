@@ -1,4 +1,4 @@
-import { LIMITS, MAX_OBSERVATION_ELEMENTS, fail, ok, sanitizeUrl, withoutQueryValues, type Candidate, type Observation, type Result } from '@flowpilot/shared';
+import { LIMITS, MAX_OBSERVATION_ELEMENTS, fail, ok, sanitizeUrl, maskQueryValues, type Candidate, type Observation, type Result } from '@flowpilot/shared';
 import { isIrreversibleAction, isSensitiveField, submissionScope } from '../recorder/classify';
 import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, sameOrigin, stableAttributes, submitsCrossOrigin, textOf } from './dom';
 
@@ -54,7 +54,7 @@ export function describeCandidate(el: Element, ref: string): Candidate {
   const context = rowContext(el);
   const section = sectionLabel(el);
   const attributes = stableAttributes(el);
-  if (attributes.href !== undefined) attributes.href = withoutQueryValues(attributes.href);
+  if (attributes.href !== undefined) attributes.href = maskQueryValues(attributes.href);
   const candidate: Candidate = { ref, tag: el.tagName.toLowerCase(), attributes };
   if (role) candidate.role = role;
   if (name) candidate.name = name;
@@ -86,7 +86,7 @@ export function observePage(doc: Document = document, newId: () => string = () =
   }
   const url = doc.defaultView?.location.href ?? '';
   current = { id: newId(), url, refs, observed };
-  return { snapshotId: current.id, url: withoutQueryValues(sanitizeUrl(url)), title: normalizeText(doc.title), elements };
+  return { snapshotId: current.id, url: maskQueryValues(sanitizeUrl(url)), title: normalizeText(doc.title), elements };
 }
 
 /**

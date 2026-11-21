@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   RUN_RECOVERY_LIMITS,
+  maskQueryValues,
   fail,
   ok,
   type Candidate,
@@ -303,11 +304,13 @@ describe('link query values (security review)', () => {
     const { client, requests } = backend(propose('e2'));
     await recoverStep(recoveryEnv, client, context({ step: { id: 's5', kind: 'click', target: recorded } }));
     expect(JSON.stringify(requests[0])).not.toContain('s3cr3t');
-    expect(requests[0]?.step.target.attributes.href).toBe('/dl?X-Amz-Signature');
+    expect(requests[0]?.step.target.attributes.href).toBe(maskQueryValues('/dl?X-Amz-Signature=s3cr3t'));
   });
 
-  it('a link observed without query values still shares identity with the recorded link', () => {
-    expect(sharesIdentity(recorded, { ref: 'e1', tag: 'a', role: 'link', name: 'Télécharger', attributes: { href: '/dl?X-Amz-Signature' } })).toBe(true);
+  it('a masked link shares identity with the same recorded link, never with another value', () => {
+    const link = (href: string): Candidate => ({ ref: 'e1', tag: 'a', role: 'link', name: 'Télécharger', attributes: { href: maskQueryValues(href) } });
+    expect(sharesIdentity(recorded, link('/dl?X-Amz-Signature=s3cr3t'))).toBe(true);
+    expect(sharesIdentity(recorded, link('/dl?X-Amz-Signature=other'))).toBe(false);
   });
 });
 
