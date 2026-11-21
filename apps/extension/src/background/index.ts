@@ -63,13 +63,29 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse: Re
 });
 
 // Port of the recorded tab's content script: its heartbeat keeps this worker alive during a
-// recording (see `RECORDER_PORT`). It carries no command; anything else is closed.
+// recording (see `RECORDER_PORT`). It carries no command. Each heartbeat checks that the tab is
+// still the recorded one (not at connection: the page starts capturing just before the session
+// becomes `recording`); otherwise (a page restored from the back/forward cache after the
+// recording ended) it is told to stop and closed, so the worker is not kept alive for nothing.
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== RECORDER_PORT || port.sender === undefined || !isFromContentScript(port.sender)) {
+  const tabId = port.sender?.tab?.id;
+  if (port.name !== RECORDER_PORT || port.sender === undefined || !isFromContentScript(port.sender) || tabId === undefined) {
     port.disconnect();
     return;
   }
-  port.onMessage.addListener(() => undefined);
+  const refuse = () => {
+    try {
+      port.postMessage({ type: 'stop' });
+      port.disconnect();
+    } catch {
+      // Already disconnected by the page.
+    }
+  };
+  port.onMessage.addListener(() => {
+    controller.isRecordingTab(tabId).then((recording) => {
+      if (!recording) refuse();
+    }, refuse);
+  });
 });
 
 // Navigations de l'onglet enregistré. `changeInfo.url` n'est fourni que pour

@@ -59,6 +59,10 @@ function holdWorker(): void {
     capture.stop(); // extension reloaded: this script is orphaned
     return;
   }
+  // The worker refuses the port when this tab is no longer recorded (e.g. restored from bfcache).
+  workerPort.onMessage.addListener((message: unknown) => {
+    if (typeof message === 'object' && message !== null && (message as { type?: unknown }).type === 'stop') stopCapture();
+  });
   workerPort.onDisconnect.addListener(() => {
     workerPort = null;
     clearInterval(heartbeat);

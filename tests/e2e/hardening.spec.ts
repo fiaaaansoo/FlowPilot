@@ -32,6 +32,26 @@ async function stopServiceWorkers(cdp: CDPSession): Promise<void> {
   await cdp.send('ServiceWorker.stopAllWorkers');
 }
 
+/** Stops the extension's worker, then waits until something starts it again (fails after 5 s). */
+async function stopAndAwaitRestart(cdp: CDPSession): Promise<void> {
+  await cdp.send('ServiceWorker.enable');
+  let stopped = false;
+  const restarted = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('The service worker was not restarted within 5 s'));
+    }, 5_000);
+    cdp.on('ServiceWorker.workerVersionUpdated', ({ versions }) => {
+      if (versions.some((v) => v.runningStatus === 'stopped')) stopped = true;
+      else if (stopped && versions.some((v) => v.runningStatus === 'running')) {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+  });
+  await cdp.send('ServiceWorker.stopAllWorkers');
+  await restarted;
+}
+
 /** Evaluates `expression` in the content script's isolated world of `page`. */
 async function evaluateInContentScript(page: Page, extensionId: string, expression: string): Promise<unknown> {
   const cdp = await page.context().newCDPSession(page);
@@ -147,10 +167,9 @@ test.describe('Service worker lifecycle', () => {
     await demo.getByLabel('Mots-clés').fill('python');
     await demo.getByLabel('Mots-clés').blur();
     await demo.waitForTimeout(500);
-    await stopServiceWorkers(await context.newCDPSession(demo));
-    // A human pause between two interactions. The click then leaves the page at once: an event
-    // sent to a stopped worker by a page that is unloading would be lost.
-    await demo.waitForTimeout(1_000);
+    // The recorded page notices the stop through its port and wakes the worker again; without
+    // that, the worker stays stopped and the next click, which leaves the page at once, is lost.
+    await stopAndAwaitRestart(await context.newCDPSession(demo));
     await demo.getByRole('button', { name: 'Rechercher' }).click();
     await expect(demo).toHaveURL(/results\.html\?q=python/);
     await demo.waitForTimeout(500);
