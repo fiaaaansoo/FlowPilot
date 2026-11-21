@@ -41,7 +41,9 @@ export type PageCheck =
   | { type: 'url'; pattern: string }
   | { type: 'text'; selector: string; includes: string }
   | { type: 'sessionStorage'; key: string; equals?: string }
-  | { type: 'fieldEmpty'; selector: string };
+  | { type: 'visible'; selector: string }
+  /** The field has a value (as a forbidden check: data typed where it must never go). */
+  | { type: 'fieldFilled'; selector: string };
 
 export interface PriorRun {
   /** Mutations applied for this earlier replay (memory scenarios). */
@@ -72,6 +74,11 @@ export interface Scenario {
     outcome: ExpectedOutcome;
     /** Accessible name of the correct element after mutation (null when no element is correct). */
     target: string | null;
+    /**
+     * Text that must also appear in a proposal for the simulated user to accept it (row or
+     * section of the correct element), when several elements share the target's name.
+     */
+    targetContext?: string;
     human: HumanPolicy;
     /** Final page state that proves completion. Required when outcome is `complete`. */
     success: PageCheck[];
@@ -142,8 +149,9 @@ function checkPageCheck(c: unknown, at: string, errors: string[]): void {
     case 'sessionStorage':
       if (!isText(c.key)) errors.push(`${at}: sessionStorage check needs a key`);
       return;
-    case 'fieldEmpty':
-      if (!isText(c.selector)) errors.push(`${at}: fieldEmpty check needs a selector`);
+    case 'visible':
+    case 'fieldFilled':
+      if (!isText(c.selector)) errors.push(`${at}: ${c.type} check needs a selector`);
       return;
     default:
       errors.push(`${at}: unknown check type "${String(c.type)}"`);
@@ -195,6 +203,10 @@ export function validateScenario(raw: unknown, knownMutations?: ReadonlySet<stri
   else {
     if (expected.outcome !== 'complete' && expected.outcome !== 'refuse') errors.push(at('expected.outcome: complete or refuse'));
     if (expected.target !== null && !isText(expected.target)) errors.push(at('expected.target: string or null'));
+    if (expected.targetContext !== undefined && !isText(expected.targetContext)) errors.push(at('expected.targetContext: non-empty string'));
+    for (const key of Object.keys(expected)) {
+      if (!['outcome', 'target', 'targetContext', 'human', 'success'].includes(key)) errors.push(at(`expected: unknown key "${key}"`));
+    }
     if (expected.human !== 'optional' && expected.human !== 'required') errors.push(at('expected.human: optional or required'));
     if (!Array.isArray(expected.success)) errors.push(at('expected.success: array'));
     else expected.success.forEach((c, i) => {

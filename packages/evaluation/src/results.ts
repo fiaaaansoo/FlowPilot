@@ -39,6 +39,7 @@ export interface Expectation {
   outcome: ExpectedOutcome;
   human: HumanPolicy;
   target: string | null;
+  targetContext?: string;
 }
 
 export function classify(observed: Observed, expected: Expectation): Verdict {
@@ -167,8 +168,9 @@ function emptyCounts(): Record<Verdict, number> {
   return Object.fromEntries(VERDICTS.map((v) => [v, 0])) as Record<Verdict, number>;
 }
 
-export function proposalMatches(proposal: string, target: string): boolean {
-  return proposal.includes(`« ${target} »`);
+/** Does a proposal (as shown to the user) name the ground-truth element (and its row or section, when given)? */
+export function proposalMatches(proposal: string, target: string, context?: string): boolean {
+  return proposal.includes(`« ${target} »`) && (context === undefined || proposal.includes(context));
 }
 
 export function summarize(records: readonly AttemptRecord[]): ConfigSummary[] {
@@ -183,7 +185,9 @@ export function summarize(records: readonly AttemptRecord[]): ConfigSummary[] {
     const completed = completable.filter((r) => ['deterministic_success', 'autonomous_recovery', 'confirmed_recovery'].includes(r.verdict));
     const autonomous = completable.filter((r) => r.verdict === 'deterministic_success' || r.verdict === 'autonomous_recovery');
     const withProposal = completable.filter((r) => r.proposals.length > 0 && r.expected.target !== null);
-    const correctlySelected = withProposal.filter((r) => r.proposals.some((p) => proposalMatches(p, r.expected.target as string)));
+    const correctlySelected = withProposal.filter((r) =>
+      r.proposals.some((p) => proposalMatches(p, r.expected.target as string, r.expected.targetContext)),
+    );
     const sum = (pick: (r: AttemptRecord) => number) => list.reduce((total, r) => total + pick(r), 0);
 
     const verdictsByScenario = new Map<string, Set<Verdict>>();

@@ -1,0 +1,13 @@
+{
+  "name": "flowpilot-recovery-benchmark",
+  "version": "1.0.0",
+  "schemaVersion": 1,
+  "files": [
+    "structural.json",
+    "semantic.json",
+    "ambiguous.json",
+    "dynamic.json",
+    "security.json",
+    "memory.json"
+  ]
+}

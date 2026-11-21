@@ -1,0 +1,310 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "ambiguous-duplicate-results",
+    "category": "ambiguous",
+    "title": "Every result card duplicated",
+    "rationale": "Each card appears twice, identically; both copies lead to the same offer, so either is correct.",
+    "workflow": {
+      "id": "open-offer",
+      "gestures": [
+        {
+          "goto": "/results.html?q=data&ville="
+        },
+        {
+          "click": {
+            "role": "link",
+            "name": "Data engineer junior"
+          }
+        },
+        {
+          "waitForUrl": "offer\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "duplicate-results"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Data engineer junior",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "offer\\.html\\?id=data-paris"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "ambiguous-duplicate-button",
+    "category": "ambiguous",
+    "title": "A second « Rechercher » button in another form",
+    "rationale": "A newsletter form with its own « Rechercher » appears above the search form. Only the search form's button is right.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "duplicate-search-button"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ],
+      "targetContext": "Rechercher une offre"
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      },
+      {
+        "type": "sessionStorage",
+        "key": "newsletterSubmitted"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "ambiguous-similar-actions",
+    "category": "ambiguous",
+    "title": "Two similar labels with different consequences",
+    "rationale": "The search button becomes « Trouver des offres » next to « Trouver des offres sponsorisées », which does something else.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "similar-actions"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Trouver des offres",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      },
+      {
+        "type": "sessionStorage",
+        "key": "sponsoredClicked"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "ambiguous-competing-synonyms",
+    "category": "ambiguous",
+    "title": "Two synonyms, one is the submit button",
+    "rationale": "The search button becomes « Trouver »; a new « Chercher » button opens help. The submit button of the search form is the right one.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "competing-synonyms"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Trouver",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      },
+      {
+        "type": "sessionStorage",
+        "key": "helpOpened"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "ambiguous-identical-save-buttons",
+    "category": "ambiguous",
+    "title": "Save buttons lose their distinguishing names",
+    "rationale": "Every save button is now just « Sauvegarder »; only the row tells them apart.",
+    "workflow": {
+      "id": "save-offer",
+      "gestures": [
+        {
+          "goto": "/results.html?q=data&ville="
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Sauvegarder Data engineer junior"
+          }
+        }
+      ]
+    },
+    "mutations": [
+      "duplicate-save-labels"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Sauvegarder",
+      "human": "optional",
+      "success": [
+        {
+          "type": "text",
+          "selector": "#results button",
+          "includes": "Sauvegardée"
+        }
+      ],
+      "targetContext": "Data engineer junior"
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "ambiguous-twin-cards",
+    "category": "ambiguous",
+    "title": "A second offer with the same title",
+    "rationale": "Another company publishes an offer with the same title right after the recorded one. Only the original company's card is right.",
+    "workflow": {
+      "id": "open-offer",
+      "gestures": [
+        {
+          "goto": "/results.html?q=data&ville="
+        },
+        {
+          "click": {
+            "role": "link",
+            "name": "Data engineer junior"
+          }
+        },
+        {
+          "waitForUrl": "offer\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "twin-cards"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Data engineer junior",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "offer\\.html\\?id=data-paris"
+        }
+      ],
+      "targetContext": "Relais Numérique"
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      },
+      {
+        "type": "sessionStorage",
+        "key": "twinOpened"
+      }
+    ]
+  }
+]

@@ -1,0 +1,406 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "dynamic-delayed-with-spinner",
+    "category": "dynamic",
+    "title": "Button rendered late behind a loading indicator",
+    "rationale": "The search button appears after 0.8 s; an aria-busy placeholder shows meanwhile.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "delay-search-button"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "dynamic-delayed-silent",
+    "category": "dynamic",
+    "title": "Button rendered late without any indicator",
+    "rationale": "The search button appears after 2.5 s with nothing announcing it. The element does arrive, so waiting is right.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "delay-search-button=silent"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "dynamic-delayed-renamed",
+    "category": "dynamic",
+    "title": "Button rendered late with a new label",
+    "rationale": "After 1 s of loading, the button appears as « Trouver des offres ».",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "delay-search-button=renamed"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Trouver des offres",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "dynamic-replaced-after-render",
+    "category": "dynamic",
+    "title": "Button re-created after rendering",
+    "rationale": "A framework replaces the button node 0.3 s after load (same label).",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "replace-search-button"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "dynamic-loading-overlay",
+    "category": "dynamic",
+    "title": "Button hidden during a loading overlay",
+    "rationale": "A progressbar overlay hides the button for 1.2 s.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "loading-overlay"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "dynamic-async-results",
+    "category": "dynamic",
+    "title": "Results loaded asynchronously",
+    "rationale": "The result list is empty and aria-busy for 1.5 s, then filled.",
+    "workflow": {
+      "id": "open-offer",
+      "gestures": [
+        {
+          "goto": "/results.html?q=data&ville="
+        },
+        {
+          "click": {
+            "role": "link",
+            "name": "Data engineer junior"
+          }
+        },
+        {
+          "waitForUrl": "offer\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "async-results"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Data engineer junior",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "offer\\.html\\?id=data-paris"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "dynamic-spa-slow-busy",
+    "category": "dynamic",
+    "title": "Slow SPA view with a loading indicator",
+    "rationale": "The alerts view renders after 2.5 s; the loading placeholder is aria-busy.",
+    "workflow": {
+      "id": "spa-alert",
+      "gestures": [
+        {
+          "goto": "/spa.html"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés de l’alerte",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Créer l’alerte"
+          }
+        }
+      ]
+    },
+    "mutations": [
+      "spa-delay=2500",
+      "spa-busy"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Mots-clés de l’alerte",
+      "human": "optional",
+      "success": [
+        {
+          "type": "text",
+          "selector": "#alert-created",
+          "includes": "Alerte créée : data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "dynamic-spa-slow-silent",
+    "category": "dynamic",
+    "title": "Slow SPA view without a loading indicator",
+    "rationale": "The alerts view renders after 2.5 s behind a plain « Chargement… » text.",
+    "workflow": {
+      "id": "spa-alert",
+      "gestures": [
+        {
+          "goto": "/spa.html"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés de l’alerte",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Créer l’alerte"
+          }
+        }
+      ]
+    },
+    "mutations": [
+      "spa-delay=2500"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Mots-clés de l’alerte",
+      "human": "optional",
+      "success": [
+        {
+          "type": "text",
+          "selector": "#alert-created",
+          "includes": "Alerte créée : data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  }
+]

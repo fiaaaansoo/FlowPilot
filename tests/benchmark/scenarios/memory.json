@@ -1,0 +1,372 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "memory-validated-reuse",
+    "category": "memory",
+    "title": "Same change as a confirmed earlier run",
+    "rationale": "The user confirmed « Trouver des offres » in an earlier run of this workflow; the page has not changed since.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=synonym"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Trouver des offres",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ],
+    "priorRuns": [
+      {
+        "mutations": [
+          "search-label=synonym"
+        ],
+        "acceptProposal": true
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "memory-similar-page",
+    "category": "memory",
+    "title": "Learned correction on a similar page",
+    "rationale": "The confirmed correction still exists, next to a similar new control with another effect.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "similar-actions"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Trouver des offres",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      },
+      {
+        "type": "sessionStorage",
+        "key": "sponsoredClicked"
+      }
+    ],
+    "priorRuns": [
+      {
+        "mutations": [
+          "search-label=synonym"
+        ],
+        "acceptProposal": true
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "memory-obsolete",
+    "category": "memory",
+    "title": "Learned correction no longer on the page",
+    "rationale": "The page changed again (« Lancer la recherche »): the stored correction matches nothing.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=reworded"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Lancer la recherche",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ],
+    "priorRuns": [
+      {
+        "mutations": [
+          "search-label=synonym"
+        ],
+        "acceptProposal": true
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "memory-conflicting",
+    "category": "memory",
+    "title": "Learned label now belongs to another control",
+    "rationale": "The search button is now « Lancer la recherche », while a control identical to the learned correction (« Trouver des offres », submit) belongs to another form.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=reworded",
+      "decoy-synonym"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Lancer la recherche",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      },
+      {
+        "type": "sessionStorage",
+        "key": "trapTriggered"
+      }
+    ],
+    "priorRuns": [
+      {
+        "mutations": [
+          "search-label=synonym"
+        ],
+        "acceptProposal": true
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "memory-other-workflow",
+    "category": "memory",
+    "title": "Correction learned in another workflow",
+    "rationale": "The correction was confirmed in a different workflow (search for « qa ») on the same site.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=synonym"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Trouver des offres",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ],
+    "priorRuns": [
+      {
+        "mutations": [
+          "search-label=synonym"
+        ],
+        "acceptProposal": true,
+        "separateWorkflow": true
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "memory-declined-not-learned",
+    "category": "memory",
+    "title": "Proposal declined earlier",
+    "rationale": "The user declined the proposal in an earlier run; nothing may be remembered from it.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=synonym"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Trouver des offres",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?q=data"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ],
+    "priorRuns": [
+      {
+        "mutations": [
+          "search-label=synonym"
+        ],
+        "acceptProposal": false
+      }
+    ]
+  }
+]
