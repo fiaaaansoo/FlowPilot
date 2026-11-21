@@ -8,6 +8,7 @@ import {
   patternFromUserInput,
   patternLabel,
   sanitizeUrl,
+  maskQueryValues,
   urlMatches,
 } from './origin.js';
 
@@ -83,6 +84,29 @@ describe('sanitizeUrl', () => {
     ['http://x.fr/dept?code=75', 'http://x.fr/dept?code=75'],
   ])('%s → %s', (input, expected) => {
     expect(sanitizeUrl(input)).toBe(expected);
+  });
+});
+
+describe('maskQueryValues', () => {
+  it('replaces every query value by a digest, keeps keys, drops a fragment carrying parameters', () => {
+    const masked = maskQueryValues('https://bucket.example/f.pdf?X-Amz-Signature=abc123&X-Amz-Credential=AKIA#k=v');
+    expect(masked).toMatch(/^https:\/\/bucket\.example\/f\.pdf\?X-Amz-Signature=~[0-9a-f]{16}&X-Amz-Credential=~[0-9a-f]{16}$/);
+    expect(masked).not.toContain('abc123');
+    expect(masked).not.toContain('AKIA');
+    expect(maskQueryValues('/offer.html?id=qa-nantes#apply')).toMatch(/^\/offer\.html\?id=~[0-9a-f]{16}#apply$/);
+    expect(maskQueryValues('/results.html')).toBe('/results.html');
+    expect(maskQueryValues('/app?')).toBe('/app');
+  });
+
+  it('a pair without "=" is masked whole (a bare token is a value, not a key)', () => {
+    const masked = maskQueryValues('/unsubscribe?eyJhbGciOiJIUzI1NiJ9.secret');
+    expect(masked).toMatch(/^\/unsubscribe\?~[0-9a-f]{16}$/);
+  });
+
+  it('keeps links comparable: equal values give equal digests, different values different ones', () => {
+    expect(maskQueryValues('/settings?tab=privacy')).toBe(maskQueryValues('/settings?tab=privacy'));
+    expect(maskQueryValues('/settings?tab=privacy')).not.toBe(maskQueryValues('/settings?tab=billing'));
+    expect(maskQueryValues('/doc?id=1')).not.toBe(maskQueryValues('/doc?id=2'));
   });
 });
 

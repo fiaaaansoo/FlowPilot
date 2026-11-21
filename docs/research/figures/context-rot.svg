@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 340" width="640" height="340" role="img" aria-label="Correct proposals versus distractors on the page" font-family="system-ui, sans-serif" font-size="12">
+<style>text{fill:#333}.grid{stroke:#ccc;stroke-width:1}@media (prefers-color-scheme: dark){text{fill:#ddd}.grid{stroke:#555}}</style>
+<title>Correct proposals versus distractors on the page</title>
+<text x="8" y="18" font-size="14" font-weight="600">Correct proposals versus distractors on the page</text>
+
+<line class="grid" x1="60" x2="470" y1="290.0" y2="290.0"/><text x="54" y="294.0" text-anchor="end">0 %</text>
+<line class="grid" x1="60" x2="470" y1="227.5" y2="227.5"/><text x="54" y="231.5" text-anchor="end">25 %</text>
+<line class="grid" x1="60" x2="470" y1="165.0" y2="165.0"/><text x="54" y="169.0" text-anchor="end">50 %</text>
+<line class="grid" x1="60" x2="470" y1="102.5" y2="102.5"/><text x="54" y="106.5" text-anchor="end">75 %</text>
+<line class="grid" x1="60" x2="470" y1="40.0" y2="40.0"/><text x="54" y="44.0" text-anchor="end">100 %</text>
+<text x="60.0" y="308" text-anchor="middle">0</text>
+<text x="196.7" y="308" text-anchor="middle">50</text>
+<text x="333.3" y="308" text-anchor="middle">150</text>
+<text x="470.0" y="308" text-anchor="middle">300</text>
+<text x="265" y="330" text-anchor="middle">distractor controls added to the page</text>
+<text transform="translate(14 165) rotate(-90)" text-anchor="middle">proposals naming the right element</text>
+<polyline fill="none" stroke="#3d6fb6" stroke-width="2" points="60.0,65.0 196.7,90.0 333.3,90.0 470.0,90.0"/><circle cx="60.0" cy="65.0" r="3.5" fill="#3d6fb6"><title>qwen2.5:3b@minimal, 0: 90 %</title></circle><circle cx="196.7" cy="90.0" r="3.5" fill="#3d6fb6"><title>qwen2.5:3b@minimal, 50: 80 %</title></circle><circle cx="333.3" cy="90.0" r="3.5" fill="#3d6fb6"><title>qwen2.5:3b@minimal, 150: 80 %</title></circle><circle cx="470.0" cy="90.0" r="3.5" fill="#3d6fb6"><title>qwen2.5:3b@minimal, 300: 80 %</title></circle>
+<rect x="482" y="40" width="10" height="10" fill="#3d6fb6"/><text x="496" y="49">qwen2.5:3b@minimal</text>
+<polyline fill="none" stroke="#1f7a5a" stroke-width="2" points="60.0,65.0 196.7,65.0 333.3,65.0 470.0,65.0"/><circle cx="60.0" cy="65.0" r="3.5" fill="#1f7a5a"><title>qwen2.5:3b@ranked, 0: 90 %</title></circle><circle cx="196.7" cy="65.0" r="3.5" fill="#1f7a5a"><title>qwen2.5:3b@ranked, 50: 90 %</title></circle><circle cx="333.3" cy="65.0" r="3.5" fill="#1f7a5a"><title>qwen2.5:3b@ranked, 150: 90 %</title></circle><circle cx="470.0" cy="65.0" r="3.5" fill="#1f7a5a"><title>qwen2.5:3b@ranked, 300: 90 %</title></circle>
+<rect x="482" y="60" width="10" height="10" fill="#1f7a5a"/><text x="496" y="69">qwen2.5:3b@ranked</text>
+<polyline fill="none" stroke="#c9a227" stroke-width="2" points="60.0,65.0 196.7,90.0 333.3,65.0 470.0,65.0"/><circle cx="60.0" cy="65.0" r="3.5" fill="#c9a227"><title>qwen2.5:3b@extended, 0: 90 %</title></circle><circle cx="196.7" cy="90.0" r="3.5" fill="#c9a227"><title>qwen2.5:3b@extended, 50: 80 %</title></circle><circle cx="333.3" cy="65.0" r="3.5" fill="#c9a227"><title>qwen2.5:3b@extended, 150: 90 %</title></circle><circle cx="470.0" cy="65.0" r="3.5" fill="#c9a227"><title>qwen2.5:3b@extended, 300: 90 %</title></circle>
+<rect x="482" y="80" width="10" height="10" fill="#c9a227"/><text x="496" y="89">qwen2.5:3b@extended</text>
+<polyline fill="none" stroke="#6b4fa3" stroke-width="2" points="60.0,65.0 196.7,115.0 333.3,115.0 470.0,115.0"/><circle cx="60.0" cy="65.0" r="3.5" fill="#6b4fa3"><title>qwen2.5:3b@unranked, 0: 90 %</title></circle><circle cx="196.7" cy="115.0" r="3.5" fill="#6b4fa3"><title>qwen2.5:3b@unranked, 50: 70 %</title></circle><circle cx="333.3" cy="115.0" r="3.5" fill="#6b4fa3"><title>qwen2.5:3b@unranked, 150: 70 %</title></circle><circle cx="470.0" cy="115.0" r="3.5" fill="#6b4fa3"><title>qwen2.5:3b@unranked, 300: 70 %</title></circle>
+<rect x="482" y="100" width="10" height="10" fill="#6b4fa3"/><text x="496" y="109">qwen2.5:3b@unranked</text>
+</svg>

@@ -4,5 +4,6 @@
 
 ## Batch B — Agentic backend and evaluation (sequential: Sprint 4 depends on Sprint 3)
 
+- 🔓 `sprint-3-validation.md` — free
 - 🔓 `sprint-4-evaluation.md` — free
 

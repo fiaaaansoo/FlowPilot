@@ -1,4 +1,4 @@
-import { applyVariant } from './variants';
+import { applyMutations } from './mutations';
 import { JOBS } from './jobs';
 
 const params = new URLSearchParams(location.search);
@@ -67,4 +67,4 @@ form.addEventListener('submit', (event) => {
 });
 
 // Controlled interface variation (tests and benchmarks only; none by default).
-applyVariant();
+applyMutations();

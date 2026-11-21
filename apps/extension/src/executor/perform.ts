@@ -1,5 +1,5 @@
 import { fail, ok, type ElementStep, type PerformResponse } from '@flowpilot/shared';
-import { isDisabled } from '../grounding/dom';
+import { foreignDestination, isDisabled, submitsCrossOrigin } from '../grounding/dom';
 import { resolveRef } from '../grounding/observe';
 import { waitForTarget } from '../grounding/resolve';
 import { isIrreversibleAction, submissionScope } from '../recorder/classify';
@@ -13,6 +13,8 @@ import { isIrreversibleAction, submissionScope } from '../recorder/classify';
  */
 export interface PerformOptions {
   timeoutMs: number;
+  /** Report a missing target early once the page is settled (0 = wait the full timeout). */
+  settleMs?: number;
   /** Un humain a validé l'étape (confirmation au replay). */
   confirmed: boolean;
   signal?: AbortSignal;
@@ -25,8 +27,8 @@ export interface PerformOptions {
 }
 
 export async function performStep(step: ElementStep, options: PerformOptions): Promise<PerformResponse> {
-  const { timeoutMs, signal, doc = document } = options;
-  const resolved = await waitForTarget(step.target, timeoutMs, doc, 100, signal);
+  const { timeoutMs, signal, doc = document, settleMs = 0 } = options;
+  const resolved = await waitForTarget(step.target, timeoutMs, doc, 100, signal, settleMs);
   if (!resolved.ok) return resolved;
   if (signal?.aborted) return fail('NAVIGATION_FAILED', 'Exécution arrêtée.');
   return actOn(resolved.value.element, step, resolved.value.strategy, options);
@@ -60,6 +62,11 @@ function actOn(el: Element, step: ElementStep, strategy: string, options: Perfor
   const judged = step.kind === 'press' ? submissionScope(el) : el;
   if ((step.kind === 'click' || step.kind === 'submit' || step.kind === 'press') && !confirmed && isIrreversibleAction(judged)) {
     return fail('CONFIRMATION_REQUIRED', 'Cette action semble irréversible : confirmation humaine requise.');
+  }
+  // Form data sent to another site is treated like an irreversible action, whatever found the element.
+  if ((step.kind === 'click' || step.kind === 'submit' || step.kind === 'press') && !confirmed && submitsCrossOrigin(judged)) {
+    const to = foreignDestination(judged);
+    return fail('CONFIRMATION_REQUIRED', `Ce formulaire envoie des données vers un autre site (${to ?? 'origine inconnue'}) : confirmation humaine requise.`);
   }
   if (el instanceof HTMLElement) el.scrollIntoView({ block: 'center', inline: 'nearest' });
 

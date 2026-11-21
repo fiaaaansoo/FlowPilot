@@ -1,4 +1,4 @@
-import { accessibleName } from '../grounding/dom';
+import { SENSITIVE_MARKER, accessibleName } from '../grounding/dom';
 
 /**
  * Classement des éléments au moment de la capture, dans le content script,
@@ -10,7 +10,7 @@ const SENSITIVE_NAME =
   /(pass(word|wd)?|mot[\s_-]*de[\s_-]*passe|\bmdp\b|\bpwd\b|\bpin\b|cvv|cvc|cryptogramme|card[\s_-]*(number|num|no)|num(é|e)ro[\s_-]*de[\s_-]*carte|\biban\b|\bbic\b|\bssn\b|s(é|e)curit(é|e)[\s_-]*sociale|secret|token|\botp\b|code[\s_-]*(de[\s_-]*)?(v(é|e)rification|confirmation|sms))/i;
 
 /** Marquage explicite par le site ou l'utilisateur : tout le sous-arbre est sensible. */
-export const SENSITIVE_MARKER = '[data-flowpilot-sensitive], [data-private], [data-sensitive]';
+export { SENSITIVE_MARKER };
 
 /** Champ dont la valeur ne doit jamais être enregistrée. */
 export function isSensitiveField(el: Element): boolean {
@@ -50,7 +50,7 @@ const IRREVERSIBLE =
  */
 /** Enter in a text field submits its form: that form, judged by its submit button, is what really acts. */
 export function submissionScope(el: Element): Element {
-  return el instanceof HTMLInputElement ? (el.closest('form') ?? el) : el;
+  return el instanceof HTMLInputElement ? (el.form ?? el.closest('form') ?? el) : el;
 }
 
 export function isIrreversibleAction(el: Element): boolean {

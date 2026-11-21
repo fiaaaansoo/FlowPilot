@@ -73,7 +73,17 @@ def post_json(
     except httpx.TimeoutException as exc:
         raise ProviderError("timeout", f"{service} did not answer within {timeout_s:.0f} s.", retryable=True) from exc
     except httpx.HTTPError as exc:
-        raise ProviderError("unreachable", f"{service} is unreachable at {url}: {exc}") from exc
+        where = redact_url(url)
+        raise ProviderError("unreachable", f"{service} is unreachable at {where}: {exc}".replace(url, where)) from exc
+
+
+def redact_url(url: str) -> str:
+    """The URL without user info nor query: credentials put in a base URL never reach an error message."""
+    try:
+        parsed = httpx.URL(url)
+    except httpx.InvalidURL:
+        return "<invalid URL>"
+    return str(parsed.copy_with(userinfo=b"", query=None))
 
 
 class ModelProvider(Protocol):

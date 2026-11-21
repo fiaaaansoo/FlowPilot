@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   RUN_RECOVERY_LIMITS,
+  maskQueryValues,
   fail,
   ok,
   type Candidate,
@@ -11,7 +12,7 @@ import {
   type Result,
 } from '@flowpilot/shared';
 import { target } from '../test/fakes';
-import { RunRecoveryBudget, createBackendClient, recoverStep, type BackendClient, type RecoveryContext, type RecoveryEnv } from './recovery';
+import { RunRecoveryBudget, createBackendClient, recoverStep, sharesIdentity, type BackendClient, type RecoveryContext, type RecoveryEnv } from './recovery';
 
 const STEP: ElementStep = { id: 's5', kind: 'click', target: target('Rechercher des offres') };
 const BUTTON: Candidate = { ref: 'e2', tag: 'button', role: 'button', name: 'Trouver des offres', attributes: { type: 'submit' } };
@@ -270,6 +271,15 @@ describe('recoverStep', () => {
     expect(result.ok).toBe(true);
     expect(calls.map((c) => c.confirmed)).toEqual([false, true]);
     expect(requestHuman).toHaveBeenCalledOnce();
+    // The user is told why the page asks, not only what the model proposes.
+    expect(requestHuman).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ai-proposal', warning: 'irréversible' }));
+  });
+
+  it('an irreversible proposal says so in the prompt', async () => {
+    const { recoveryEnv } = env([{ ...BUTTON, irreversible: true }, LINK_OUT, FIELD]);
+    const requestHuman = vi.fn(() => Promise.resolve(true));
+    await recoverStep(recoveryEnv, backend(propose('e2')).client, context({ requestHuman }));
+    expect(requestHuman).toHaveBeenCalledWith(expect.objectContaining({ warning: expect.stringContaining('irréversible') as string }));
   });
 
   it('enforces the per-run recovery budget', async () => {
@@ -283,6 +293,24 @@ describe('recoverStep', () => {
     const tokens = new RunRecoveryBudget();
     tokens.tokens = RUN_RECOVERY_LIMITS.maxTokens - 100;
     expect(tokens.requestBudget().maxTokens).toBe(100);
+  });
+});
+
+describe('link query values (security review)', () => {
+  const recorded = target('Rapport', { tag: 'a', role: 'link', attributes: { href: '/dl?X-Amz-Signature=s3cr3t' } });
+
+  it('the recorded step is sent without the query values of its href', async () => {
+    const { recoveryEnv } = env();
+    const { client, requests } = backend(propose('e2'));
+    await recoverStep(recoveryEnv, client, context({ step: { id: 's5', kind: 'click', target: recorded } }));
+    expect(JSON.stringify(requests[0])).not.toContain('s3cr3t');
+    expect(requests[0]?.step.target.attributes.href).toBe(maskQueryValues('/dl?X-Amz-Signature=s3cr3t'));
+  });
+
+  it('a masked link shares identity with the same recorded link, never with another value', () => {
+    const link = (href: string): Candidate => ({ ref: 'e1', tag: 'a', role: 'link', name: 'Télécharger', attributes: { href: maskQueryValues(href) } });
+    expect(sharesIdentity(recorded, link('/dl?X-Amz-Signature=s3cr3t'))).toBe(true);
+    expect(sharesIdentity(recorded, link('/dl?X-Amz-Signature=other'))).toBe(false);
   });
 });
 

@@ -511,6 +511,11 @@ p {
   font-size: 0.9rem;
 }
 
+.human-prompt__warning {
+  font-weight: 600;
+  color: var(--danger);
+}
+
 .human-prompt__actions {
   display: flex;
   flex-wrap: wrap;

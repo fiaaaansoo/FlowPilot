@@ -12,6 +12,7 @@ import {
   type StepLog,
   type Workflow,
   type WorkflowStep,
+  type HumanPromptInfo,
 } from '@flowpilot/shared';
 
 /**
@@ -42,7 +43,7 @@ export interface StepDriver {
    * Attend l'intervention humaine (confirmation ou saisie manuelle) sur l'étape.
    * `false` si le run est arrêté entre-temps.
    */
-  requestHuman(stepIndex: number, signal: AbortSignal): Promise<boolean>;
+  requestHuman(stepIndex: number, signal: AbortSignal, prompt?: HumanPromptInfo): Promise<boolean>;
   /** Optional AI recovery; `null` when recovery is disabled or not applicable. */
   recover?(stepIndex: number, step: ElementStep, failure: FlowPilotError, signal: AbortSignal): Promise<StepRecovery | null>;
   /** Reports whether a recovered step was confirmed by what happened next. */
@@ -133,7 +134,9 @@ export async function runWorkflow(workflow: Workflow, driver: StepDriver, option
       // La page juge l'élément trouvé irréversible alors que l'étape n'était pas marquée :
       // on demande l'accord humain, puis on réessaie une seule fois.
       if (!result.ok && result.error.code === 'CONFIRMATION_REQUIRED' && !confirmed) {
-        if (!(await driver.requestHuman(index, signal))) return abortAt(index, step, stepStart);
+        // The page judged the element sensitive: show the user why (irreversible label, data sent elsewhere).
+        const warning: HumanPromptInfo = { kind: 'warning', message: result.error.message.slice(0, 300) };
+        if (!(await driver.requestHuman(index, signal, warning))) return abortAt(index, step, stepStart);
         confirmed = true;
         result = await runHandler(step, driver, signal, confirmed);
       }

@@ -1,8 +1,8 @@
-# Sprint 2 — tests DEV
+# Sprint 2 — DEV tests
 
-À faire dans un vrai Chrome, avec le Side Panel natif (les e2e l'ouvrent comme un onglet).
+To run in a real Chrome, with the native side panel (the e2e tests open it as a tab). UI labels are quoted as shown in the (French) interface.
 
-- [ ] 🖱️ `npm run build`, recharger `apps/extension/dist`, `npm run dev:demo` : enregistrer recherche → offre → Postuler → envoi ; les étapes s'affichent en direct ; Arrêter puis Rejouer depuis une autre page ; confirmer « Postuler » et « Envoyer la candidature » ; résultat « Dernière lecture réussie ».
-- [ ] 🖱️ `spa.html` : se connecter (mot de passe) pendant l'enregistrement, vérifier qu'aucune valeur de mot de passe n'apparaît dans le panneau ; au replay, l'invite « Saisie manuelle requise » attend la saisie.
-- [ ] 🖱️ Créer deux alertes identiques sauf les mots-clés, enregistrer la suppression de la seconde, recréer une alerte au-dessus, rejouer : c'est bien la bonne ligne qui est supprimée (invite de confirmation avec la ligne affichée).
-- [ ] 🖱️ Sur un site réel autorisé (application React ou Vue publique), enregistrer une recherche puis la rejouer : la saisie est prise en compte par le framework.
+- [ ] 🖱️ `npm run build`, reload `apps/extension/dist`, `npm run dev:demo`: record search → offer → « Postuler » → submit; steps appear live; « Arrêter », then « Rejouer » from another page; confirm « Postuler » and « Envoyer la candidature »; result « Dernière lecture réussie ».
+- [ ] 🖱️ `spa.html`: sign in (password) while recording, check that no password value appears in the panel; on replay, the « Saisie manuelle requise » prompt waits for the input.
+- [ ] 🖱️ Create two alerts identical except for their keywords, record the deletion of the second one, create another alert above them, replay: the right row is deleted (confirmation prompt shows the row).
+- [ ] 🖱️ On a real allowed site (public React or Vue application), record a search then replay it: the framework takes the typed value into account.

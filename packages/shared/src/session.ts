@@ -32,8 +32,8 @@ export interface ReplayingSession {
   stepIndex: number;
   /** Présent quand le replay attend une intervention humaine sur l'étape `stepIndex`. */
   awaitingHuman?: true;
-  /** Set when the pending human decision is about an AI recovery proposal. */
-  humanPrompt?: AiProposalPrompt;
+  /** Set when the pending human decision is about an AI recovery proposal, or needs an explanation. */
+  humanPrompt?: HumanPromptInfo;
 }
 
 /** What the side panel shows before executing an AI-recovered step. Texts come from the page or the model: display only. */
@@ -44,7 +44,18 @@ export interface AiProposalPrompt {
   strategy: 'memory' | 'semantic' | 'llm' | 'none';
   confidence: number;
   rationale: string;
+  /** Why the user must decide, from the extension or the page (irreversible, data sent elsewhere). Never from the model. */
+  warning?: string;
 }
+
+/** Why a plain confirmation is needed, when it is not just "this step may be irreversible". */
+export interface WarningPrompt {
+  kind: 'warning';
+  /** Shown as is (e.g. "Ce formulaire envoie des données vers https://… : confirmation humaine requise."). */
+  message: string;
+}
+
+export type HumanPromptInfo = AiProposalPrompt | WarningPrompt;
 
 export type SessionState = IdleSession | RecordingSession | ReplayingSession;
 export type SessionStatus = SessionState['status'];
@@ -53,7 +64,7 @@ export type SessionEvent =
   | { type: 'RECORD_STARTED'; tabId: number; origin: string; workflowId: string; startedAt: number }
   | { type: 'REPLAY_STARTED'; tabId: number; workflowId: string; startedAt: number }
   | { type: 'STEP_STARTED'; stepIndex: number }
-  | { type: 'HUMAN_REQUESTED'; stepIndex: number; prompt?: AiProposalPrompt }
+  | { type: 'HUMAN_REQUESTED'; stepIndex: number; prompt?: HumanPromptInfo }
   | { type: 'HUMAN_RESOLVED' }
   | { type: 'STOPPED' }
   | { type: 'REPLAY_FINISHED' };
@@ -98,7 +109,7 @@ export function transition(state: SessionState, event: SessionEvent): Result<Ses
   }
 }
 
-function replaying(state: ReplayingSession, stepIndex: number, awaitingHuman: boolean, prompt?: AiProposalPrompt): ReplayingSession {
+function replaying(state: ReplayingSession, stepIndex: number, awaitingHuman: boolean, prompt?: HumanPromptInfo): ReplayingSession {
   const { status, tabId, workflowId, startedAt } = state;
   return {
     status,
@@ -111,12 +122,17 @@ function replaying(state: ReplayingSession, stepIndex: number, awaitingHuman: bo
   };
 }
 
-function parsePrompt(raw: unknown): AiProposalPrompt | undefined {
+function parsePrompt(raw: unknown): HumanPromptInfo | undefined {
+  if (isRecord(raw) && raw.kind === 'warning' && typeof raw.message === 'string') {
+    return { kind: 'warning', message: raw.message.slice(0, 300) };
+  }
   if (!isRecord(raw) || raw.kind !== 'ai-proposal') return undefined;
-  const { proposed, strategy, confidence, rationale } = raw;
+  const { proposed, strategy, confidence, rationale, warning } = raw;
   if (typeof proposed !== 'string' || typeof rationale !== 'string' || !isNum(confidence)) return undefined;
   if (strategy !== 'memory' && strategy !== 'semantic' && strategy !== 'llm' && strategy !== 'none') return undefined;
-  return { kind: 'ai-proposal', proposed: proposed.slice(0, 300), strategy, confidence, rationale: rationale.slice(0, 300) };
+  const prompt: AiProposalPrompt = { kind: 'ai-proposal', proposed: proposed.slice(0, 300), strategy, confidence, rationale: rationale.slice(0, 300) };
+  if (typeof warning === 'string' && warning) prompt.warning = warning.slice(0, 300);
+  return prompt;
 }
 
 function invalid(state: SessionState, event: SessionEvent): Result<never> {

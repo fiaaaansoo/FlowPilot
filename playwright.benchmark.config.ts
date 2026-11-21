@@ -1,17 +1,19 @@
 import { defineConfig } from '@playwright/test';
 
 /**
- * Recovery benchmark (not part of `npm run test:e2e`): `npm run bench`.
- * Each mode starts its own backend; set FLOWPILOT_BENCH_OLLAMA_MODEL to add
- * the local-model modes. Results go to `bench-results/`.
+ * Evaluation runner (not part of `npm run test:e2e`): `npm run eval`, configured by
+ * FLOWPILOT_EVAL_* variables (tests/benchmark/eval.spec.ts). Each configuration starts
+ * its own backend; results go to `eval-results/<run>/results.jsonl`.
  */
 export default defineConfig({
   testDir: 'tests/benchmark',
+  testMatch: '**/*.spec.ts', // *.test.ts files are Vitest unit tests
   fullyParallel: false,
   workers: 1,
   retries: 0,
   reporter: 'list',
-  use: { baseURL: 'http://localhost:5173' },
+  // Bounded actions: a click on a prompt that closed meanwhile must not stall a whole configuration.
+  use: { baseURL: 'http://localhost:5173', actionTimeout: 10_000 },
   webServer: {
     command: 'npm run dev -w @flowpilot/demo-site',
     url: 'http://localhost:5173',

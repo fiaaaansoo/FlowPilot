@@ -6,7 +6,7 @@
  * condition pour que Chrome réveille le worker sur ces événements (le worker
  * peut être arrêté entre deux interactions d'un enregistrement).
  */
-import { fail, isCommand, isContentHello, parseContentEvent, type CommandResponse, type ContentHelloReply } from '@flowpilot/shared';
+import { RECORDER_PORT, fail, isCommand, isContentHello, parseContentEvent, type CommandResponse, type ContentHelloReply } from '@flowpilot/shared';
 import { chromeArea } from '../storage/area';
 import { RunStore } from '../storage/run-store';
 import { SessionStore } from '../storage/session-store';
@@ -60,6 +60,32 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse: Re
     sendResponse(fail('INTERNAL', 'Erreur interne de l’extension.'));
   });
   return true; // réponse asynchrone
+});
+
+// Port of the recorded tab's content script: its heartbeat keeps this worker alive during a
+// recording (see `RECORDER_PORT`). It carries no command. Each heartbeat checks that the tab is
+// still the recorded one (not at connection: the page starts capturing just before the session
+// becomes `recording`); otherwise (a page restored from the back/forward cache after the
+// recording ended) it is told to stop and closed, so the worker is not kept alive for nothing.
+chrome.runtime.onConnect.addListener((port) => {
+  const tabId = port.sender?.tab?.id;
+  if (port.name !== RECORDER_PORT || port.sender === undefined || !isFromContentScript(port.sender) || tabId === undefined) {
+    port.disconnect();
+    return;
+  }
+  const refuse = () => {
+    try {
+      port.postMessage({ type: 'stop' });
+      port.disconnect();
+    } catch {
+      // Already disconnected by the page.
+    }
+  };
+  port.onMessage.addListener(() => {
+    controller.isRecordingTab(tabId).then((recording) => {
+      if (!recording) refuse();
+    }, refuse);
+  });
 });
 
 // Navigations de l'onglet enregistré. `changeInfo.url` n'est fourni que pour

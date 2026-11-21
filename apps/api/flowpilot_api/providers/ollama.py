@@ -20,8 +20,15 @@ class OllamaProvider:
     local = True
 
     def __init__(
-        self, *, base_url: str, model: str, num_ctx: int = 4096, transport: httpx.BaseTransport | None = None
+        self,
+        *,
+        base_url: str,
+        model: str,
+        num_ctx: int = 4096,
+        keep_alive: str = "5m",
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
+        self.keep_alive = keep_alive
         if not model:
             raise ProviderError("model_not_configured", "FLOWPILOT_MODEL must name an installed Ollama model.")
         self.base_url = base_url.rstrip("/")
@@ -41,6 +48,7 @@ class OllamaProvider:
         body = {
             "model": self.model,
             "stream": False,
+            "keep_alive": self.keep_alive,
             "format": schema,
             "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": max_output_tokens},
             "messages": chat_messages(system, messages),

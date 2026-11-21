@@ -9,6 +9,7 @@ import {
   originOf,
   parseRecoveryResponse,
   sameBinding,
+  maskQueryValues,
   type AiProposalPrompt,
   type AiSettings,
   type Candidate,
@@ -152,6 +153,11 @@ export function validateProposal(
 /** Human-readable description of a candidate, for the confirmation prompt (untrusted text, display only). */
 const IDENTIFIERS = ['id', 'name', 'data-testid', 'data-test', 'data-qa', 'data-cy', 'href'] as const;
 
+/** Attributes as sent to the recovery service: a link's query values leave the extension only as digests. */
+function safeAttributes(attributes: Record<string, string>): Record<string, string> {
+  return attributes.href === undefined ? attributes : { ...attributes, href: maskQueryValues(attributes.href) };
+}
+
 /** Word stems of a label (accents and case ignored, short words dropped). */
 function stems(text: string | undefined): Set<string> {
   const words = (text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/);
@@ -160,7 +166,9 @@ function stems(text: string | undefined): Set<string> {
 
 /** Does the candidate share a stable identifier or a label word with the recorded element? */
 export function sharesIdentity(target: ElementStep['target'], candidate: Candidate): boolean {
-  if (IDENTIFIERS.some((key) => target.attributes[key] !== undefined && target.attributes[key] === candidate.attributes[key])) return true;
+  // Observed hrefs carry masked query values: compare the recorded one in the same form.
+  const recordedAttribute = (key: (typeof IDENTIFIERS)[number]) => (key === 'href' ? safeAttributes(target.attributes).href : target.attributes[key]);
+  if (IDENTIFIERS.some((key) => recordedAttribute(key) !== undefined && recordedAttribute(key) === candidate.attributes[key])) return true;
   const recorded = stems(target.name ?? target.text);
   return [...stems(candidate.name ?? candidate.text)].some((stem) => recorded.has(stem));
 }
@@ -259,7 +267,7 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
         snapshotId: observation.value.snapshotId,
       },
       failure: { code: ctx.failure.code === 'TARGET_AMBIGUOUS' ? 'TARGET_AMBIGUOUS' : 'TARGET_NOT_FOUND', message: ctx.failure.message.slice(0, 500) },
-      step: { kind: ctx.step.kind, target: ctx.step.target },
+      step: { kind: ctx.step.kind, target: { ...ctx.step.target, attributes: safeAttributes(ctx.step.target.attributes) } },
       page: { url: observation.value.url, title: observation.value.title },
       observation: { snapshotId: observation.value.snapshotId, elements: observation.value.elements },
       attempts: [...attempts],
@@ -304,6 +312,7 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
       continue;
     }
     const { candidate, confidence, rationale, strategy, requiresConfirmation } = validated.value;
+    log.proposed = candidateLabel(candidate).slice(0, 300);
 
     // HUMAN: model doubt, irreversible element, original confirmation, or "always confirm" mode.
     let confirmed = false;
@@ -317,6 +326,7 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
       (strategy !== 'semantic' && ctx.step.kind !== 'click') ||
       (strategy === 'llm' && !sharesIdentity(ctx.step.target, candidate));
     const prompt: AiProposalPrompt = { kind: 'ai-proposal', proposed: candidateLabel(candidate), strategy, confidence, rationale };
+    if (candidate.irreversible === true) prompt.warning = 'Cette action semble irréversible.';
     if (mustConfirm) {
       if (!(await ctx.requestHuman(prompt))) return escalate('aborted', ABORTED, 'refusé par l’utilisateur');
       confirmed = true;
@@ -328,8 +338,8 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
     // EXECUTE + immediate VERIFY (effect checks of the deterministic executor).
     let executed = await env.performRef(ctx.tabId, ctx.step, observation.value.snapshotId, candidate.ref, confirmed, ctx.signal);
     if (!executed.ok && executed.error.code === 'CONFIRMATION_REQUIRED' && !confirmed) {
-      // The page itself judges the element irreversible: ask, then retry once.
-      if (!(await ctx.requestHuman(prompt))) return escalate('aborted', ABORTED, 'refusé par l’utilisateur');
+      // The page itself judges the element irreversible or leaving the site: say why, ask, then retry once.
+      if (!(await ctx.requestHuman({ ...prompt, warning: executed.error.message }))) return escalate('aborted', ABORTED, 'refusé par l’utilisateur');
       executed = await env.performRef(ctx.tabId, ctx.step, observation.value.snapshotId, candidate.ref, true, ctx.signal);
     }
     if (executed.ok) {

@@ -1,6 +1,6 @@
-import { LIMITS, MAX_OBSERVATION_ELEMENTS, fail, ok, sanitizeUrl, type Candidate, type Observation, type Result } from '@flowpilot/shared';
+import { LIMITS, MAX_OBSERVATION_ELEMENTS, fail, ok, sanitizeUrl, maskQueryValues, type Candidate, type Observation, type Result } from '@flowpilot/shared';
 import { isIrreversibleAction, isSensitiveField, submissionScope } from '../recorder/classify';
-import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, stableAttributes, textOf } from './dom';
+import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, sameOrigin, stableAttributes, submitsCrossOrigin, textOf } from './dom';
 
 /**
  * Page observation for AI recovery (content script).
@@ -37,35 +37,14 @@ const SECTION = 'form, section, nav, header, footer, aside, main, fieldset, dial
 function sectionLabel(el: Element): string | undefined {
   const container = el.parentElement?.closest(SECTION);
   if (!container) return undefined;
-  const label =
-    container.getAttribute('aria-label') ??
-    container.querySelector(':scope > legend, :scope > h1, :scope > h2, :scope > h3, :scope > h4')?.textContent ??
-    container.ownerDocument.querySelector('h1')?.textContent;
+  const heading = container.querySelector(':scope > legend, :scope > h1, :scope > h2, :scope > h3, :scope > h4') ?? container.ownerDocument.querySelector('h1');
+  const label = container.getAttribute('aria-label') ?? (heading ? textOf(heading) : undefined);
   const text = normalizeText(label);
   return text || undefined;
 }
 
 const CONTRACT_TAG = /^[a-z][a-z0-9-]{0,31}$/;
 
-/** Where activating the element sends the user or the form data: a link target, a form action, a formaction. */
-function destination(el: Element): string | null {
-  if (el instanceof HTMLAnchorElement || el instanceof HTMLAreaElement) return el.getAttribute('href');
-  if (el instanceof HTMLFormElement) return el.getAttribute('action');
-  if ((el instanceof HTMLButtonElement || el instanceof HTMLInputElement) && el.form) {
-    return el.getAttribute('formaction') ?? el.form.getAttribute('action');
-  }
-  return null;
-}
-
-function sameOrigin(el: Element): boolean {
-  const target = destination(el);
-  if (!target) return true;
-  try {
-    return new URL(target, el.ownerDocument.baseURI).origin === el.ownerDocument.defaultView?.location.origin;
-  } catch {
-    return false;
-  }
-}
 
 /** Observed identity of an element: what must still hold when a proposal is executed. */
 export function describeCandidate(el: Element, ref: string): Candidate {
@@ -74,7 +53,9 @@ export function describeCandidate(el: Element, ref: string): Candidate {
   const text = normalizeText(textOf(el), 100); // '' for fields: values are never read
   const context = rowContext(el);
   const section = sectionLabel(el);
-  const candidate: Candidate = { ref, tag: el.tagName.toLowerCase(), attributes: stableAttributes(el) };
+  const attributes = stableAttributes(el);
+  if (attributes.href !== undefined) attributes.href = maskQueryValues(attributes.href);
+  const candidate: Candidate = { ref, tag: el.tagName.toLowerCase(), attributes };
   if (role) candidate.role = role;
   if (name) candidate.name = name;
   if (text && text !== name) candidate.text = text;
@@ -82,7 +63,8 @@ export function describeCandidate(el: Element, ref: string): Candidate {
   if (section && section !== name) candidate.section = section;
   if (isDisabled(el)) candidate.disabled = true;
   if (isIrreversibleAction(el) || isIrreversibleAction(submissionScope(el))) candidate.irreversible = true;
-  if (!sameOrigin(el)) candidate.sameOrigin = false;
+  // A link or submit control that leaves the origin, or a field whose Enter would send its form there.
+  if (!sameOrigin(el) || submitsCrossOrigin(submissionScope(el))) candidate.sameOrigin = false;
   return candidate;
 }
 
@@ -104,12 +86,23 @@ export function observePage(doc: Document = document, newId: () => string = () =
   }
   const url = doc.defaultView?.location.href ?? '';
   current = { id: newId(), url, refs, observed };
-  return { snapshotId: current.id, url: sanitizeUrl(url), title: normalizeText(doc.title), elements };
+  return { snapshotId: current.id, url: maskQueryValues(sanitizeUrl(url)), title: normalizeText(doc.title), elements };
 }
 
-/** Identity check: tag, role and accessible name must be unchanged since the snapshot. */
+/**
+ * Identity check: what the user and the service saw must still hold. Tag, role, name, row and
+ * section (a node reused by a re-render may now sit in another row), destination, and the
+ * judgements that decide whether a human is asked (irreversible, leaving the origin).
+ */
 const sameIdentity = (a: Candidate, b: Candidate): boolean =>
-  a.tag === b.tag && (a.role ?? '') === (b.role ?? '') && (a.name ?? '') === (b.name ?? '');
+  a.tag === b.tag &&
+  (a.role ?? '') === (b.role ?? '') &&
+  (a.name ?? '') === (b.name ?? '') &&
+  (a.context ?? '') === (b.context ?? '') &&
+  (a.section ?? '') === (b.section ?? '') &&
+  a.attributes.href === b.attributes.href &&
+  a.irreversible === b.irreversible &&
+  a.sameOrigin === b.sameOrigin;
 
 /**
  * Resolve a ref from the latest snapshot, refusing anything stale: other

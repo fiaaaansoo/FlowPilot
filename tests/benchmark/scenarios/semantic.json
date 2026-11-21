@@ -1,0 +1,505 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "semantic-reworded",
+    "category": "semantic",
+    "title": "Search button reworded",
+    "rationale": "« Rechercher » becomes « Lancer la recherche »: same word stem, same control.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=reworded"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Lancer la recherche",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "semantic-synonym",
+    "category": "semantic",
+    "title": "Search button renamed with a synonym",
+    "rationale": "« Rechercher » becomes « Trouver des offres »: no shared word, same control.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=synonym"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Trouver des offres",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "semantic-english",
+    "category": "semantic",
+    "title": "Search button translated to English",
+    "rationale": "« Rechercher » becomes « Search » (site localized).",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=english"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Search",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "semantic-shortened",
+    "category": "semantic",
+    "title": "Search button shortened",
+    "rationale": "« Rechercher » becomes « Chercher ».",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=short"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Chercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "semantic-expanded",
+    "category": "semantic",
+    "title": "Search button with a longer description",
+    "rationale": "« Rechercher » becomes « Rechercher les offres d’emploi correspondantes ».",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=expanded"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher les offres d’emploi correspondantes",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "semantic-accessible-name",
+    "category": "semantic",
+    "title": "Accessible name changed, visible text unchanged",
+    "rationale": "An aria-label « Valider la recherche » overrides the visible « Rechercher ».",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-aria"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Valider la recherche",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "semantic-field-label",
+    "category": "semantic",
+    "title": "Keyword field relabelled",
+    "rationale": "The field « Mots-clés » becomes « Poste recherché ». Typing the recorded value there is correct.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "keyword-label"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Poste recherché",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "semantic-save-english",
+    "category": "semantic",
+    "title": "Save buttons translated",
+    "rationale": "« Sauvegarder <title> » becomes « Save <title> » on every card.",
+    "workflow": {
+      "id": "save-offer",
+      "gestures": [
+        {
+          "goto": "/results.html?q=data&ville="
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Sauvegarder Data engineer junior"
+          }
+        }
+      ]
+    },
+    "mutations": [
+      "save-label"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Save Data engineer junior",
+      "human": "optional",
+      "success": [
+        {
+          "type": "text",
+          "selector": "#results button",
+          "includes": "Sauvegardée"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "semantic-apply-synonym",
+    "category": "semantic",
+    "title": "Irreversible button renamed",
+    "rationale": "« Postuler » becomes « Candidater ». Same action, still irreversible: the user must confirm.",
+    "workflow": {
+      "id": "apply",
+      "gestures": [
+        {
+          "goto": "/offer.html?id=data-paris&q=data&ville="
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Postuler",
+            "exact": true
+          }
+        }
+      ]
+    },
+    "mutations": [
+      "apply-label=synonym"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Candidater",
+      "human": "required",
+      "success": [
+        {
+          "type": "visible",
+          "selector": "#apply-form"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "semantic-long-label",
+    "category": "semantic",
+    "title": "Search button with a longer, legitimate label (held out)",
+    "rationale": "Held out: added after the long-label scoring change. « Rechercher » becomes « Rechercher parmi toutes nos offres »: same control.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=long"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher parmi toutes nos offres",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ],
+    "heldOut": true
+  }
+]

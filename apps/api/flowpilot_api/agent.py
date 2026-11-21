@@ -51,7 +51,7 @@ from .context_builder import (
 from .contracts import Binding, Candidate, Decision, Escalate, ProposeTarget, RecoveryRequest, RecoveryResponse, Usage
 from .grounding import Score, accepts, decide, rank, score
 from .pricing import estimate_cost
-from .prompts import ACTION_SCHEMA, PROMPT_VERSION, SYSTEM_PROMPT, render_user_message
+from .prompts import get_prompt
 from .providers import Message, ModelProvider, ProviderError
 from .store import Correction, Store, now_iso
 from .text import normalize, tokens
@@ -129,6 +129,7 @@ class RecoveryAgent:
         self.settings = settings
         self.store = store
         self.provider = provider
+        self.prompt = get_prompt(settings.prompt_version)
 
     # --- entry point ------------------------------------------------------------
 
@@ -153,7 +154,7 @@ class RecoveryAgent:
         run.usable = usable = usable_candidates(request)
 
         # MEMORY: a verified correction is reused only if it matches exactly one current element.
-        prior = self._memory_lookup(run)
+        prior = self._memory_lookup(run) if self.settings.memory_enabled else None
         if prior is not None:
             matches = [c for c in usable if _same_element(prior.corrected, c)]
             run.log(State.MEMORY, correction=prior.id, matches=len(matches))
@@ -183,6 +184,7 @@ class RecoveryAgent:
             usable=usable,
             max_elements=self.settings.context_max_elements,
             max_chars=self.settings.context_max_chars,
+            ranking=self.settings.context_ranking,
         )
         run.pack = pack
         run.shown = set(pack.by_ref)
@@ -234,7 +236,7 @@ class RecoveryAgent:
         messages = [
             Message(
                 "user",
-                render_user_message(
+                self.prompt.render(
                     task_json=render_task(request),
                     page_json=render_untrusted(request, run.pack),
                     prior_correction=hint,
@@ -290,7 +292,7 @@ class RecoveryAgent:
         attempts = 0
         budget = run.request.budget
         while True:
-            estimated_input = (len(SYSTEM_PROMPT) + sum(len(m.content) for m in messages)) // 3
+            estimated_input = (len(self.prompt.system) + sum(len(m.content) for m in messages)) // 3
             tokens_left = budget.max_tokens - run.input_tokens - run.output_tokens - estimated_input
             max_output = min(MAX_OUTPUT_TOKENS, tokens_left)
             if max_output < MIN_OUTPUT_TOKENS:
@@ -311,9 +313,9 @@ class RecoveryAgent:
             remaining = max(1.0, run.deadline - time.perf_counter())
             try:
                 reply = self.provider.complete(
-                    system=SYSTEM_PROMPT,
+                    system=self.prompt.system,
                     messages=messages,
-                    schema=ACTION_SCHEMA,
+                    schema=self.prompt.schema,
                     timeout_s=min(self.settings.llm_timeout_s, remaining),
                     max_output_tokens=max_output,
                 )
@@ -455,7 +457,7 @@ class RecoveryAgent:
         usage = Usage(
             provider=self.provider.name if self.provider and run.calls else "none",
             model=self.provider.model if self.provider and run.calls else None,
-            prompt_version=PROMPT_VERSION,
+            prompt_version=self.prompt.version,
             model_calls=run.calls,
             input_tokens=run.input_tokens,
             output_tokens=run.output_tokens,
@@ -484,7 +486,7 @@ class RecoveryAgent:
                 else None,
                 "provider": usage.provider,
                 "model": usage.model,
-                "prompt_version": PROMPT_VERSION,
+                "prompt_version": self.prompt.version,
                 "model_calls": run.calls,
                 "input_tokens": run.input_tokens,
                 "output_tokens": run.output_tokens,
@@ -512,6 +514,9 @@ def _same_element(stored: Candidate, current: Candidate) -> bool:
     for key in ("id", "name", "data-testid", "href", "type"):
         if stored.attributes.get(key) != current.attributes.get(key):
             return False
+    # The same control in another form or region is a different control (a twin with another effect).
+    if stored.section and normalize(stored.section) != normalize(current.section):
+        return False
     return not stored.context or normalize(stored.context) == normalize(current.context)
 
 

@@ -178,7 +178,7 @@ machine), [ADR 0003](adr/0003-verified-memory-sqlite.md) (verified memory in SQL
 | Page content as data | `<untrusted_page_content>`, schema-forced output, gateway checks |
 | `RunStore` | `StepLog.recovery` telemetry; corrections stored by the backend |
 | Stable prompt prefix | Versioned prompt, `cache_control` on the system prompt with Anthropic |
-| Evaluation | Demo-site variants (`?variante=`), `tests/e2e/recovery.spec.ts`, `npm run bench` |
+| Evaluation | Mutation registry (`?m=`), versioned scenarios, `packages/evaluation`, `npm run eval` (Sprint 4, [ADR 0005](adr/0005-evaluation-framework.md)) |
 
 ## Known limitations
 
@@ -194,6 +194,7 @@ machine), [ADR 0003](adr/0003-verified-memory-sqlite.md) (verified memory in SQL
 - The `code` and `state` URL parameters are removed only together (OAuth return); on their own, they are often business parameters.
 - If saving a workflow fails (storage full), the draft is kept, but the next recording replaces it: no recovery is offered.
 - The "irreversible" heuristic is deliberately broad (e.g. « Postuler » (Apply)): a few superfluous confirmations.
+- During a recording, the recorded tab's content script holds a port to the service worker: a heartbeat every 20 s keeps the worker from being stopped for inactivity, and if Chrome stops it anyway the page reconnects within ~100 ms, which restarts it. A click that leaves the page inside that restart window (a forced stop immediately followed by a navigating click) can still be lost; the following navigation is recorded.
 - Replay acts on the active tab of the last used window and does not survive a service worker restart (marked as failed). Without an open Side Panel, a confirmation wait of more than ~30 s may be interrupted by the worker stopping.
 - Workflows can be neither renamed nor edited from the panel.
 - AI recovery handles element steps only (not navigations, URL waits or manual input), on the main

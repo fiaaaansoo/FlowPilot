@@ -73,7 +73,11 @@ def score(target: ElementTarget, candidate: Candidate) -> Score:
     """Similarity in [0, 1] between the recorded target and a candidate."""
     old_label = tokens(_label(target))
     new_label = tokens(_label(candidate))
-    label = max(jaccard(old_label, new_label), 0.85 * overlap(old_label, new_label))
+    # Containment ("Lancer la recherche" contains "Rechercher") is strong evidence only when the
+    # candidate adds at most one word; a long label that merely contains the recorded words (an
+    # injected aria-label, "Rechercher et supprimer mes alertes") gets proportionally less credit.
+    concise = min(1.0, (len(old_label) + 1) / len(new_label)) if new_label else 0.0
+    label = max(jaccard(old_label, new_label), 0.85 * overlap(old_label, new_label) * concise)
 
     old_ids = _identifiers(target)
     identifiers = jaccard(old_ids, _identifiers(candidate)) if old_ids else 0.0

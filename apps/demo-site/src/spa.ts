@@ -1,3 +1,4 @@
+import { mutationArg } from './mutations';
 /**
  * Mini-application monopage : routage par `history.pushState`, contenu rendu
  * en différé (simule un appel réseau), formulaires sans rechargement.
@@ -8,7 +9,9 @@
 type View = 'alertes' | 'connexion';
 
 /** Délai de « chargement » de chaque vue, en ms (surchargeable : `?delai=0`). */
-const DELAY = Number(new URLSearchParams(location.search).get('delai') ?? 400);
+const DELAY = Number(new URLSearchParams(location.search).get('delai') ?? mutationArg('spa-delay') ?? 400);
+/** Benchmark mutation: mark the loading placeholder as busy (a loading indicator). */
+const BUSY = mutationArg('spa-busy') !== undefined;
 
 const viewRoot = document.querySelector<HTMLDivElement>('#view');
 if (!viewRoot) throw new Error('spa.html : #view introuvable');
@@ -117,7 +120,9 @@ function render(): void {
   for (const link of document.querySelectorAll<HTMLAnchorElement>('[data-view]')) {
     link.setAttribute('aria-current', link.dataset.view === view ? 'page' : 'false');
   }
-  root.replaceChildren(el('p', { className: 'summary' }, 'Chargement…'));
+  const loading = el('p', { className: 'summary' }, 'Chargement…');
+  if (BUSY) loading.setAttribute('aria-busy', 'true');
+  root.replaceChildren(loading);
   setTimeout(() => {
     if (currentView() === view) root.replaceChildren(view === 'connexion' ? renderLogin() : renderAlerts());
   }, DELAY);

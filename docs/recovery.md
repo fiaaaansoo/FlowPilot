@@ -61,14 +61,19 @@ The response is either `propose_target` (`ref`, `confidence`, `strategy`
 - No field values, passwords, payment fields, OTP fields or hidden elements: the
   observation skips sensitive and invisible elements (hidden forms included) and never
   reads `value`. Rich-text editors (`contenteditable`) and ARIA text boxes count as
-  fields: their typed content never becomes a name, a text or a row context.
-- URLs are sanitized before leaving the page (query values dropped).
+  fields: their typed content never becomes a name, a text or a row context. The text
+  of a subtree marked `data-flowpilot-sensitive` / `data-private` / `data-sensitive` is
+  never used as a name, a text, a row context or a section label either.
+- The page URL, observed link `href`s and the recorded step's `href` leave the extension
+  with every query value replaced by a 64-bit digest (keys kept), so a pre-signed or reset
+  link carries no readable secret while two links still compare as different. The digest is
+  not cryptographic: a low-entropy value (a small id) can be guessed.
 - No full-page HTML is sent or stored.
 - The model selects a `ref` among observed candidates. The action and any value
   always come from the recorded step. There is no tool that runs JavaScript,
   navigates, or types free text.
-- Cross-origin links, and forms or submit buttons whose `action`/`formaction` leaves
-  the origin, are removed from the model context and rejected by both the backend and
+- Cross-origin links, forms or submit buttons whose `action`/`formaction` leaves the
+  origin, and fields whose Enter would submit such a form, are removed from the model context and rejected by both the backend and
   the service worker.
 - Recovery never runs for `manualInput` steps, permission errors, sensitive-field
   restrictions, missing confirmations or policy errors (`isRecoverable`).
@@ -195,7 +200,7 @@ tokens and time per recovered step.
   `observe.test.ts`, controller and side panel tests (Vitest).
 - End to end: `tests/e2e/recovery.spec.ts` and `tests/e2e/lifecycle.spec.ts` on the
   shipped build with the real backend and the mock provider.
-- Benchmark: `npm run bench`, see [benchmarks](benchmarks/README.md).
+- Evaluation: `npm run eval`, see [benchmarks](benchmarks/README.md) and the [Sprint 4 research report](research/sprint-4-report.md).
 
 ## Cancellation, late answers and the service worker lifecycle
 
@@ -251,6 +256,9 @@ buffered (`limits.py`).
 - Spend of a request the extension aborted is recorded by the backend but not charged
   to the extension's per-run budget.
 - The observation skips elements whose tag is outside the contract (`^[a-z][a-z0-9-]*$`).
-- About 10 s of every recovered step is the deterministic engine waiting for the
-  recorded element before it declares it missing.
+- A missing element is declared once the page has been settled for 3 s (no DOM change,
+  no loading indicator), at most 10 s. An element that appears after a longer silent
+  pause starts recovery too early (measured in Sprint 4; the proposal then needs the user).
+- Memory reuses a correction only when the element's name, identifiers, row context and
+  section all match (a twin in another form is never reused).
 

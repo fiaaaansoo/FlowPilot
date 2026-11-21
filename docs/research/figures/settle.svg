@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 826 140" width="826" height="140" role="img" aria-label="Median time of a recovered replay, by settle window" font-family="system-ui, sans-serif" font-size="12">
+<style>text{fill:#333}.grid{stroke:#ccc;stroke-width:1}@media (prefers-color-scheme: dark){text{fill:#ddd}.grid{stroke:#555}}</style>
+<title>Median time of a recovered replay, by settle window</title>
+<text x="8" y="18" font-size="14" font-weight="600">Median time of a recovered replay, by settle window</text>
+
+<text x="8" y="54">fixed 10 s wait</text><rect x="230" y="40" width="360.0" height="20" fill="#3d6fb6"/><text x="596.0" y="54">11,813 ms · 1 dynamic misses</text>
+<text x="8" y="84">settle 1500 ms</text><rect x="230" y="70" width="100.0" height="20" fill="#3d6fb6"/><text x="336.0" y="84">3,280 ms · 4 dynamic misses</text>
+<text x="8" y="114">settle 3000 ms</text><rect x="230" y="100" width="148.0" height="20" fill="#3d6fb6"/><text x="384.0" y="114">4,856 ms · 2 dynamic misses</text>
+</svg>

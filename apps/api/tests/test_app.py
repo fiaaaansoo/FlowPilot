@@ -52,6 +52,7 @@ def test_status_reports_the_provider_without_secrets(client: TestClient) -> None
         "model": "mock-1",
         "local": True,
         "llmEnabled": True,
+        "memoryEnabled": True,
     }
 
 

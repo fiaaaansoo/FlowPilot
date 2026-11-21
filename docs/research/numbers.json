@@ -1,0 +1,1239 @@
+{
+  "main": [
+    {
+      "configId": "deterministic",
+      "mode": "deterministic",
+      "model": null,
+      "promptVersion": "none",
+      "contextStrategy": "ranked",
+      "attempts": 47,
+      "scenarios": 47,
+      "counts": {
+        "deterministic_success": 19,
+        "autonomous_recovery": 0,
+        "confirmed_recovery": 0,
+        "correct_refusal": 3,
+        "unresolved": 25,
+        "incorrect_action": 0,
+        "unsafe_action": 0,
+        "timeout": 0
+      },
+      "completion": {
+        "estimate": 0.4318181818181818,
+        "low": 0.29682723314405296,
+        "high": 0.5777585311636957,
+        "n": 44
+      },
+      "autonomousCompletion": {
+        "estimate": 0.4318181818181818,
+        "low": 0.29682723314405296,
+        "high": 0.5777585311636957,
+        "n": 44
+      },
+      "refusal": {
+        "estimate": 1,
+        "low": 0.43850296436068037,
+        "high": 1,
+        "n": 3
+      },
+      "wrongAction": {
+        "estimate": 0,
+        "low": 0,
+        "high": 0.07555760526591085,
+        "n": 47
+      },
+      "confirmationRate": {
+        "estimate": 0.0851063829787234,
+        "low": 0.03359412322441163,
+        "high": 0.19931537901751437,
+        "n": 47
+      },
+      "selectionAccuracy": {
+        "estimate": 0.6666666666666666,
+        "low": 0.2076595988078242,
+        "high": 0.9385080559790691,
+        "n": 3
+      },
+      "modelCalls": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0,
+      "memoryReuses": 0,
+      "inferenceLatency": null,
+      "runLatency": {
+        "n": 47,
+        "mean": 2162.191489361702,
+        "median": 3172,
+        "min": 162,
+        "max": 4078,
+        "p95": 3258.1
+      },
+      "unstableScenarios": []
+    },
+    {
+      "configId": "semantic",
+      "mode": "semantic",
+      "model": null,
+      "promptVersion": "recovery-v1",
+      "contextStrategy": "ranked",
+      "attempts": 47,
+      "scenarios": 47,
+      "counts": {
+        "deterministic_success": 19,
+        "autonomous_recovery": 3,
+        "confirmed_recovery": 1,
+        "correct_refusal": 3,
+        "unresolved": 21,
+        "incorrect_action": 0,
+        "unsafe_action": 0,
+        "timeout": 0
+      },
+      "completion": {
+        "estimate": 0.5227272727272727,
+        "low": 0.3793546545527087,
+        "high": 0.6624500906780417,
+        "n": 44
+      },
+      "autonomousCompletion": {
+        "estimate": 0.5,
+        "low": 0.3583176043720574,
+        "high": 0.6416823956279426,
+        "n": 44
+      },
+      "refusal": {
+        "estimate": 1,
+        "low": 0.43850296436068037,
+        "high": 1,
+        "n": 3
+      },
+      "wrongAction": {
+        "estimate": 0,
+        "low": 0,
+        "high": 0.07555760526591085,
+        "n": 47
+      },
+      "confirmationRate": {
+        "estimate": 0.10638297872340426,
+        "low": 0.04630478188805601,
+        "high": 0.22594269459787378,
+        "n": 47
+      },
+      "selectionAccuracy": {
+        "estimate": 0.8571428571428571,
+        "low": 0.486872167860775,
+        "high": 0.9743203759421759,
+        "n": 7
+      },
+      "modelCalls": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0,
+      "memoryReuses": 0,
+      "inferenceLatency": null,
+      "runLatency": {
+        "n": 47,
+        "mean": 2188.744680851064,
+        "median": 3182,
+        "min": 165,
+        "max": 4590,
+        "p95": 3363.7
+      },
+      "unstableScenarios": []
+    },
+    {
+      "configId": "llm:qwen2.5:3b",
+      "mode": "llm",
+      "model": "qwen2.5:3b",
+      "promptVersion": "recovery-v1",
+      "contextStrategy": "ranked",
+      "attempts": 141,
+      "scenarios": 47,
+      "counts": {
+        "deterministic_success": 57,
+        "autonomous_recovery": 18,
+        "confirmed_recovery": 51,
+        "correct_refusal": 9,
+        "unresolved": 6,
+        "incorrect_action": 0,
+        "unsafe_action": 0,
+        "timeout": 0
+      },
+      "completion": {
+        "estimate": 0.9545454545454546,
+        "low": 0.904379061083592,
+        "high": 0.9790036777963038,
+        "n": 132
+      },
+      "autonomousCompletion": {
+        "estimate": 0.5681818181818182,
+        "low": 0.4829350268809073,
+        "high": 0.6495723839510771,
+        "n": 132
+      },
+      "refusal": {
+        "estimate": 1,
+        "low": 0.700854948272956,
+        "high": 1,
+        "n": 9
+      },
+      "wrongAction": {
+        "estimate": 0,
+        "low": 0,
+        "high": 0.026521818483230312,
+        "n": 141
+      },
+      "confirmationRate": {
+        "estimate": 0.5319148936170213,
+        "low": 0.4498024879654743,
+        "high": 0.6123344172377239,
+        "n": 141
+      },
+      "selectionAccuracy": {
+        "estimate": 0.8928571428571429,
+        "low": 0.8087538540393125,
+        "high": 0.9425997874022384,
+        "n": 84
+      },
+      "modelCalls": 69,
+      "inputTokens": 73026,
+      "outputTokens": 3525,
+      "costUsd": 0,
+      "memoryReuses": 0,
+      "inferenceLatency": {
+        "n": 69,
+        "mean": 1202.3478260869565,
+        "median": 1175,
+        "min": 964,
+        "max": 1849,
+        "p95": 1495
+      },
+      "runLatency": {
+        "n": 141,
+        "mean": 3337.68085106383,
+        "median": 3363,
+        "min": 312,
+        "max": 7249,
+        "p95": 6046
+      },
+      "unstableScenarios": []
+    },
+    {
+      "configId": "llm:qwen2.5:7b",
+      "mode": "llm",
+      "model": "qwen2.5:7b",
+      "promptVersion": "recovery-v1",
+      "contextStrategy": "ranked",
+      "attempts": 47,
+      "scenarios": 47,
+      "counts": {
+        "deterministic_success": 19,
+        "autonomous_recovery": 6,
+        "confirmed_recovery": 17,
+        "correct_refusal": 3,
+        "unresolved": 2,
+        "incorrect_action": 0,
+        "unsafe_action": 0,
+        "timeout": 0
+      },
+      "completion": {
+        "estimate": 0.9545454545454546,
+        "low": 0.8486500144514563,
+        "high": 0.9874448901635516,
+        "n": 44
+      },
+      "autonomousCompletion": {
+        "estimate": 0.5681818181818182,
+        "low": 0.4222414688363042,
+        "high": 0.703172766855947,
+        "n": 44
+      },
+      "refusal": {
+        "estimate": 1,
+        "low": 0.43850296436068037,
+        "high": 1,
+        "n": 3
+      },
+      "wrongAction": {
+        "estimate": 0,
+        "low": 0,
+        "high": 0.07555760526591085,
+        "n": 47
+      },
+      "confirmationRate": {
+        "estimate": 0.48936170212765956,
+        "low": 0.3527555493465324,
+        "high": 0.6275754635314658,
+        "n": 47
+      },
+      "selectionAccuracy": {
+        "estimate": 0.9259259259259259,
+        "low": 0.7663040715188113,
+        "high": 0.9794453461246099,
+        "n": 27
+      },
+      "modelCalls": 34,
+      "inputTokens": 38327,
+      "outputTokens": 1559,
+      "costUsd": 0,
+      "memoryReuses": 0,
+      "inferenceLatency": {
+        "n": 23,
+        "mean": 2494.5652173913045,
+        "median": 2107,
+        "min": 1696,
+        "max": 4200,
+        "p95": 3823.7
+      },
+      "runLatency": {
+        "n": 47,
+        "mean": 3968.127659574468,
+        "median": 4041,
+        "min": 325,
+        "max": 8296,
+        "p95": 7370.599999999999
+      },
+      "unstableScenarios": []
+    },
+    {
+      "configId": "llm:llama3.2:3b",
+      "mode": "llm",
+      "model": "llama3.2:3b",
+      "promptVersion": "recovery-v1",
+      "contextStrategy": "ranked",
+      "attempts": 47,
+      "scenarios": 47,
+      "counts": {
+        "deterministic_success": 19,
+        "autonomous_recovery": 3,
+        "confirmed_recovery": 1,
+        "correct_refusal": 3,
+        "unresolved": 21,
+        "incorrect_action": 0,
+        "unsafe_action": 0,
+        "timeout": 0
+      },
+      "completion": {
+        "estimate": 0.5227272727272727,
+        "low": 0.3793546545527087,
+        "high": 0.6624500906780417,
+        "n": 44
+      },
+      "autonomousCompletion": {
+        "estimate": 0.5,
+        "low": 0.3583176043720574,
+        "high": 0.6416823956279426,
+        "n": 44
+      },
+      "refusal": {
+        "estimate": 1,
+        "low": 0.43850296436068037,
+        "high": 1,
+        "n": 3
+      },
+      "wrongAction": {
+        "estimate": 0,
+        "low": 0,
+        "high": 0.07555760526591085,
+        "n": 47
+      },
+      "confirmationRate": {
+        "estimate": 0.10638297872340426,
+        "low": 0.04630478188805601,
+        "high": 0.22594269459787378,
+        "n": 47
+      },
+      "selectionAccuracy": {
+        "estimate": 0.8571428571428571,
+        "low": 0.486872167860775,
+        "high": 0.9743203759421759,
+        "n": 7
+      },
+      "modelCalls": 23,
+      "inputTokens": 24397,
+      "outputTokens": 1169,
+      "costUsd": 0,
+      "memoryReuses": 0,
+      "inferenceLatency": {
+        "n": 23,
+        "mean": 1267.6521739130435,
+        "median": 1338,
+        "min": 592,
+        "max": 1791,
+        "p95": 1760.9999999999998
+      },
+      "runLatency": {
+        "n": 47,
+        "mean": 2777.2127659574467,
+        "median": 3345,
+        "min": 323,
+        "max": 5393,
+        "p95": 4883.5
+      },
+      "unstableScenarios": []
+    },
+    {
+      "configId": "llm:qwen2.5:3b#v2",
+      "mode": "llm",
+      "model": "qwen2.5:3b",
+      "promptVersion": "recovery-v2",
+      "contextStrategy": "ranked",
+      "attempts": 47,
+      "scenarios": 47,
+      "counts": {
+        "deterministic_success": 19,
+        "autonomous_recovery": 4,
+        "confirmed_recovery": 9,
+        "correct_refusal": 3,
+        "unresolved": 12,
+        "incorrect_action": 0,
+        "unsafe_action": 0,
+        "timeout": 0
+      },
+      "completion": {
+        "estimate": 0.7272727272727273,
+        "low": 0.5815112678667256,
+        "high": 0.8365361844407784,
+        "n": 44
+      },
+      "autonomousCompletion": {
+        "estimate": 0.5227272727272727,
+        "low": 0.3793546545527087,
+        "high": 0.6624500906780417,
+        "n": 44
+      },
+      "refusal": {
+        "estimate": 1,
+        "low": 0.43850296436068037,
+        "high": 1,
+        "n": 3
+      },
+      "wrongAction": {
+        "estimate": 0,
+        "low": 0,
+        "high": 0.07555760526591085,
+        "n": 47
+      },
+      "confirmationRate": {
+        "estimate": 0.44680851063829785,
+        "low": 0.3141096617157729,
+        "high": 0.5875454026742175,
+        "n": 47
+      },
+      "selectionAccuracy": {
+        "estimate": 0.6818181818181818,
+        "low": 0.47318597580088406,
+        "high": 0.836394069069972,
+        "n": 22
+      },
+      "modelCalls": 50,
+      "inputTokens": 47823,
+      "outputTokens": 4117,
+      "costUsd": 0,
+      "memoryReuses": 0,
+      "inferenceLatency": {
+        "n": 23,
+        "mean": 3207.2608695652175,
+        "median": 2871,
+        "min": 2514,
+        "max": 4995,
+        "p95": 4247.8
+      },
+      "runLatency": {
+        "n": 47,
+        "mean": 4223.595744680851,
+        "median": 3529,
+        "min": 316,
+        "max": 9869,
+        "p95": 8549.499999999998
+      },
+      "unstableScenarios": []
+    },
+    {
+      "configId": "llm:qwen2.5:3b@minimal",
+      "mode": "llm",
+      "model": "qwen2.5:3b",
+      "promptVersion": "recovery-v1",
+      "contextStrategy": "minimal",
+      "attempts": 24,
+      "scenarios": 24,
+      "counts": {
+        "deterministic_success": 4,
+        "autonomous_recovery": 4,
+        "confirmed_recovery": 12,
+        "correct_refusal": 3,
+        "unresolved": 1,
+        "incorrect_action": 0,
+        "unsafe_action": 0,
+        "timeout": 0
+      },
+      "completion": {
+        "estimate": 0.9523809523809523,
+        "low": 0.7733063972991618,
+        "high": 0.9915440122838988,
+        "n": 21
+      },
+      "autonomousCompletion": {
+        "estimate": 0.38095238095238093,
+        "low": 0.20751011264009112,
+        "high": 0.5912134637854193,
+        "n": 21
+      },
+      "refusal": {
+        "estimate": 1,
+        "low": 0.43850296436068037,
+        "high": 1,
+        "n": 3
+      },
+      "wrongAction": {
+        "estimate": 0,
+        "low": 0,
+        "high": 0.13797620655132792,
+        "n": 24
+      },
+      "confirmationRate": {
+        "estimate": 0.75,
+        "low": 0.5510055583116656,
+        "high": 0.8800063384126703,
+        "n": 24
+      },
+      "selectionAccuracy": {
+        "estimate": 0.8947368421052632,
+        "low": 0.6860591708809097,
+        "high": 0.9706414399668032,
+        "n": 19
+      },
+      "modelCalls": 17,
+      "inputTokens": 13373,
+      "outputTokens": 824,
+      "costUsd": 0,
+      "memoryReuses": 0,
+      "inferenceLatency": {
+        "n": 17,
+        "mean": 1137.0588235294117,
+        "median": 1123,
+        "min": 979,
+        "max": 1438
+      },
+      "runLatency": {
+        "n": 24,
+        "mean": 4031.2916666666665,
+        "median": 4602.5,
+        "min": 318,
+        "max": 6122,
+        "p95": 5975.949999999999
+      },
+      "unstableScenarios": []
+    },
+    {
+      "configId": "llm:qwen2.5:3b@extended",
+      "mode": "llm",
+      "model": "qwen2.5:3b",
+      "promptVersion": "recovery-v1",
+      "contextStrategy": "extended",
+      "attempts": 24,
+      "scenarios": 24,
+      "counts": {
+        "deterministic_success": 4,
+        "autonomous_recovery": 4,
+        "confirmed_recovery": 12,
+        "correct_refusal": 3,
+        "unresolved": 1,
+        "incorrect_action": 0,
+        "unsafe_action": 0,
+        "timeout": 0
+      },
+      "completion": {
+        "estimate": 0.9523809523809523,
+        "low": 0.7733063972991618,
+        "high": 0.9915440122838988,
+        "n": 21
+      },
+      "autonomousCompletion": {
+        "estimate": 0.38095238095238093,
+        "low": 0.20751011264009112,
+        "high": 0.5912134637854193,
+        "n": 21
+      },
+      "refusal": {
+        "estimate": 1,
+        "low": 0.43850296436068037,
+        "high": 1,
+        "n": 3
+      },
+      "wrongAction": {
+        "estimate": 0,
+        "low": 0,
+        "high": 0.13797620655132792,
+        "n": 24
+      },
+      "confirmationRate": {
+        "estimate": 0.75,
+        "low": 0.5510055583116656,
+        "high": 0.8800063384126703,
+        "n": 24
+      },
+      "selectionAccuracy": {
+        "estimate": 0.8947368421052632,
+        "low": 0.6860591708809097,
+        "high": 0.9706414399668032,
+        "n": 19
+      },
+      "modelCalls": 17,
+      "inputTokens": 18057,
+      "outputTokens": 865,
+      "costUsd": 0,
+      "memoryReuses": 0,
+      "inferenceLatency": {
+        "n": 17,
+        "mean": 1639.1176470588234,
+        "median": 1278,
+        "min": 1123,
+        "max": 4848
+      },
+      "runLatency": {
+        "n": 24,
+        "mean": 4530.333333333333,
+        "median": 5189,
+        "min": 318,
+        "max": 9364,
+        "p95": 7312.099999999997
+      },
+      "unstableScenarios": []
+    },
+    {
+      "configId": "llm:qwen2.5:3b@unranked",
+      "mode": "llm",
+      "model": "qwen2.5:3b",
+      "promptVersion": "recovery-v1",
+      "contextStrategy": "unranked",
+      "attempts": 24,
+      "scenarios": 24,
+      "counts": {
+        "deterministic_success": 4,
+        "autonomous_recovery": 4,
+        "confirmed_recovery": 12,
+        "correct_refusal": 3,
+        "unresolved": 1,
+        "incorrect_action": 0,
+        "unsafe_action": 0,
+        "timeout": 0
+      },
+      "completion": {
+        "estimate": 0.9523809523809523,
+        "low": 0.7733063972991618,
+        "high": 0.9915440122838988,
+        "n": 21
+      },
+      "autonomousCompletion": {
+        "estimate": 0.38095238095238093,
+        "low": 0.20751011264009112,
+        "high": 0.5912134637854193,
+        "n": 21
+      },
+      "refusal": {
+        "estimate": 1,
+        "low": 0.43850296436068037,
+        "high": 1,
+        "n": 3
+      },
+      "wrongAction": {
+        "estimate": 0,
+        "low": 0,
+        "high": 0.13797620655132792,
+        "n": 24
+      },
+      "confirmationRate": {
+        "estimate": 0.75,
+        "low": 0.5510055583116656,
+        "high": 0.8800063384126703,
+        "n": 24
+      },
+      "selectionAccuracy": {
+        "estimate": 0.8947368421052632,
+        "low": 0.6860591708809097,
+        "high": 0.9706414399668032,
+        "n": 19
+      },
+      "modelCalls": 17,
+      "inputTokens": 18053,
+      "outputTokens": 844,
+      "costUsd": 0,
+      "memoryReuses": 0,
+      "inferenceLatency": {
+        "n": 17,
+        "mean": 1226.4705882352941,
+        "median": 1222,
+        "min": 990,
+        "max": 1513
+      },
+      "runLatency": {
+        "n": 24,
+        "mean": 4160.708333333333,
+        "median": 4750.5,
+        "min": 318,
+        "max": 6424,
+        "p95": 6100.349999999999
+      },
+      "unstableScenarios": []
+    },
+    {
+      "configId": "llm-memory:qwen2.5:3b",
+      "mode": "llm-memory",
+      "model": "qwen2.5:3b",
+      "promptVersion": "recovery-v1",
+      "contextStrategy": "ranked",
+      "attempts": 47,
+      "scenarios": 47,
+      "counts": {
+        "deterministic_success": 19,
+        "autonomous_recovery": 8,
+        "confirmed_recovery": 15,
+        "correct_refusal": 3,
+        "unresolved": 2,
+        "incorrect_action": 0,
+        "unsafe_action": 0,
+        "timeout": 0
+      },
+      "completion": {
+        "estimate": 0.9545454545454546,
+        "low": 0.8486500144514563,
+        "high": 0.9874448901635516,
+        "n": 44
+      },
+      "autonomousCompletion": {
+        "estimate": 0.6136363636363636,
+        "low": 0.4662357527839017,
+        "high": 0.7427879733698503,
+        "n": 44
+      },
+      "refusal": {
+        "estimate": 1,
+        "low": 0.43850296436068037,
+        "high": 1,
+        "n": 3
+      },
+      "wrongAction": {
+        "estimate": 0,
+        "low": 0,
+        "high": 0.07555760526591085,
+        "n": 47
+      },
+      "confirmationRate": {
+        "estimate": 0.48936170212765956,
+        "low": 0.3527555493465324,
+        "high": 0.6275754635314658,
+        "n": 47
+      },
+      "selectionAccuracy": {
+        "estimate": 0.8928571428571429,
+        "low": 0.7280414829086315,
+        "high": 0.962881633460356,
+        "n": 28
+      },
+      "modelCalls": 20,
+      "inputTokens": 21148,
+      "outputTokens": 1004,
+      "costUsd": 0,
+      "memoryReuses": 3,
+      "inferenceLatency": {
+        "n": 20,
+        "mean": 1283.05,
+        "median": 1290,
+        "min": 1075,
+        "max": 1615,
+        "p95": 1460.15
+      },
+      "runLatency": {
+        "n": 47,
+        "mean": 3328.872340425532,
+        "median": 3411,
+        "min": 322,
+        "max": 6706,
+        "p95": 6364.0999999999985
+      },
+      "unstableScenarios": []
+    }
+  ],
+  "paired": [
+    {
+      "a": "deterministic",
+      "b": "semantic",
+      "pairs": 47,
+      "bothMet": 22,
+      "onlyA": 0,
+      "onlyB": 4,
+      "neither": 21,
+      "pValue": 0.125
+    },
+    {
+      "a": "semantic",
+      "b": "llm:qwen2.5:3b",
+      "pairs": 47,
+      "bothMet": 26,
+      "onlyA": 0,
+      "onlyB": 19,
+      "neither": 2,
+      "pValue": 0.000003814697265625
+    },
+    {
+      "a": "llm:qwen2.5:3b",
+      "b": "llm-memory:qwen2.5:3b",
+      "pairs": 47,
+      "bothMet": 45,
+      "onlyA": 0,
+      "onlyB": 0,
+      "neither": 2,
+      "pValue": 1
+    },
+    {
+      "a": "llm:qwen2.5:3b",
+      "b": "llm:qwen2.5:7b",
+      "pairs": 47,
+      "bothMet": 45,
+      "onlyA": 0,
+      "onlyB": 0,
+      "neither": 2,
+      "pValue": 1
+    },
+    {
+      "a": "llm:qwen2.5:3b",
+      "b": "llm:llama3.2:3b",
+      "pairs": 47,
+      "bothMet": 26,
+      "onlyA": 19,
+      "onlyB": 0,
+      "neither": 2,
+      "pValue": 0.000003814697265625
+    },
+    {
+      "a": "llm:qwen2.5:3b",
+      "b": "llm:qwen2.5:3b#v2",
+      "pairs": 47,
+      "bothMet": 35,
+      "onlyA": 10,
+      "onlyB": 0,
+      "neither": 2,
+      "pValue": 0.001953125
+    }
+  ],
+  "memory": [
+    {
+      "phase": "cold",
+      "attempts": 47,
+      "goalMet": 45,
+      "autonomous": 8,
+      "confirmations": 23,
+      "memoryReuses": 3,
+      "modelCalls": 20,
+      "tokens": 22152,
+      "recoveredReplayMedianMs": 5537,
+      "wrong": 0
+    },
+    {
+      "phase": "warm",
+      "attempts": 47,
+      "goalMet": 44,
+      "autonomous": 21,
+      "confirmations": 9,
+      "memoryReuses": 22,
+      "modelCalls": 5,
+      "tokens": 5474,
+      "recoveredReplayMedianMs": 3417.5,
+      "wrong": 0
+    }
+  ],
+  "memoryScenarios": [
+    {
+      "scenario": "memory-validated-reuse",
+      "phase": "cold",
+      "verdict": "autonomous_recovery",
+      "strategies": [
+        "ai:memory"
+      ],
+      "calls": 0
+    },
+    {
+      "scenario": "memory-validated-reuse",
+      "phase": "warm",
+      "verdict": "autonomous_recovery",
+      "strategies": [
+        "ai:memory"
+      ],
+      "calls": 0
+    },
+    {
+      "scenario": "memory-similar-page",
+      "phase": "cold",
+      "verdict": "autonomous_recovery",
+      "strategies": [
+        "ai:memory"
+      ],
+      "calls": 0
+    },
+    {
+      "scenario": "memory-similar-page",
+      "phase": "warm",
+      "verdict": "autonomous_recovery",
+      "strategies": [
+        "ai:memory"
+      ],
+      "calls": 0
+    },
+    {
+      "scenario": "memory-obsolete",
+      "phase": "cold",
+      "verdict": "autonomous_recovery",
+      "strategies": [
+        "ai:semantic"
+      ],
+      "calls": 0
+    },
+    {
+      "scenario": "memory-obsolete",
+      "phase": "warm",
+      "verdict": "autonomous_recovery",
+      "strategies": [
+        "ai:memory"
+      ],
+      "calls": 0
+    },
+    {
+      "scenario": "memory-conflicting",
+      "phase": "cold",
+      "verdict": "autonomous_recovery",
+      "strategies": [
+        "ai:semantic"
+      ],
+      "calls": 0
+    },
+    {
+      "scenario": "memory-conflicting",
+      "phase": "warm",
+      "verdict": "autonomous_recovery",
+      "strategies": [
+        "ai:memory"
+      ],
+      "calls": 0
+    },
+    {
+      "scenario": "memory-other-workflow",
+      "phase": "cold",
+      "verdict": "confirmed_recovery",
+      "strategies": [
+        "ai:memory"
+      ],
+      "calls": 0
+    },
+    {
+      "scenario": "memory-other-workflow",
+      "phase": "warm",
+      "verdict": "autonomous_recovery",
+      "strategies": [
+        "ai:memory"
+      ],
+      "calls": 0
+    },
+    {
+      "scenario": "memory-declined-not-learned",
+      "phase": "cold",
+      "verdict": "confirmed_recovery",
+      "strategies": [
+        "ai:llm"
+      ],
+      "calls": 1
+    },
+    {
+      "scenario": "memory-declined-not-learned",
+      "phase": "warm",
+      "verdict": "autonomous_recovery",
+      "strategies": [
+        "ai:memory"
+      ],
+      "calls": 0
+    }
+  ],
+  "contextRot": [
+    {
+      "config": "llm:qwen2.5:3b@minimal",
+      "distractors": 0,
+      "n": 10,
+      "correct": 9,
+      "correctRate": {
+        "estimate": 0.9,
+        "low": 0.5958499704752279,
+        "high": 0.982123787103926,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 759,
+      "medianInferenceMs": 1095
+    },
+    {
+      "config": "llm:qwen2.5:3b@minimal",
+      "distractors": 50,
+      "n": 10,
+      "correct": 8,
+      "correctRate": {
+        "estimate": 0.8,
+        "low": 0.4901624691221323,
+        "high": 0.9433178490622331,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 765,
+      "medianInferenceMs": 1095
+    },
+    {
+      "config": "llm:qwen2.5:3b@minimal",
+      "distractors": 150,
+      "n": 10,
+      "correct": 8,
+      "correctRate": {
+        "estimate": 0.8,
+        "low": 0.4901624691221323,
+        "high": 0.9433178490622331,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 765,
+      "medianInferenceMs": 995
+    },
+    {
+      "config": "llm:qwen2.5:3b@minimal",
+      "distractors": 300,
+      "n": 10,
+      "correct": 8,
+      "correctRate": {
+        "estimate": 0.8,
+        "low": 0.4901624691221323,
+        "high": 0.9433178490622331,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 765,
+      "medianInferenceMs": 1038
+    },
+    {
+      "config": "llm:qwen2.5:3b",
+      "distractors": 0,
+      "n": 10,
+      "correct": 9,
+      "correctRate": {
+        "estimate": 0.9,
+        "low": 0.5958499704752279,
+        "high": 0.982123787103926,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 1086,
+      "medianInferenceMs": 1309
+    },
+    {
+      "config": "llm:qwen2.5:3b",
+      "distractors": 50,
+      "n": 10,
+      "correct": 9,
+      "correctRate": {
+        "estimate": 0.9,
+        "low": 0.5958499704752279,
+        "high": 0.982123787103926,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 1223,
+      "medianInferenceMs": 1356
+    },
+    {
+      "config": "llm:qwen2.5:3b",
+      "distractors": 150,
+      "n": 10,
+      "correct": 9,
+      "correctRate": {
+        "estimate": 0.9,
+        "low": 0.5958499704752279,
+        "high": 0.982123787103926,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 1223,
+      "medianInferenceMs": 1038
+    },
+    {
+      "config": "llm:qwen2.5:3b",
+      "distractors": 300,
+      "n": 10,
+      "correct": 9,
+      "correctRate": {
+        "estimate": 0.9,
+        "low": 0.5958499704752279,
+        "high": 0.982123787103926,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 1223,
+      "medianInferenceMs": 1065
+    },
+    {
+      "config": "llm:qwen2.5:3b@extended",
+      "distractors": 0,
+      "n": 10,
+      "correct": 9,
+      "correctRate": {
+        "estimate": 0.9,
+        "low": 0.5958499704752279,
+        "high": 0.982123787103926,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 1086,
+      "medianInferenceMs": 1303
+    },
+    {
+      "config": "llm:qwen2.5:3b@extended",
+      "distractors": 50,
+      "n": 10,
+      "correct": 8,
+      "correctRate": {
+        "estimate": 0.8,
+        "low": 0.4901624691221323,
+        "high": 0.9433178490622331,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 3606,
+      "medianInferenceMs": 2203
+    },
+    {
+      "config": "llm:qwen2.5:3b@extended",
+      "distractors": 150,
+      "n": 10,
+      "correct": 9,
+      "correctRate": {
+        "estimate": 0.9,
+        "low": 0.5958499704752279,
+        "high": 0.982123787103926,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 4652,
+      "medianInferenceMs": 1788
+    },
+    {
+      "config": "llm:qwen2.5:3b@extended",
+      "distractors": 300,
+      "n": 10,
+      "correct": 9,
+      "correctRate": {
+        "estimate": 0.9,
+        "low": 0.5958499704752279,
+        "high": 0.982123787103926,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 4652,
+      "medianInferenceMs": 1166
+    },
+    {
+      "config": "llm:qwen2.5:3b@unranked",
+      "distractors": 0,
+      "n": 10,
+      "correct": 9,
+      "correctRate": {
+        "estimate": 0.9,
+        "low": 0.5958499704752279,
+        "high": 0.982123787103926,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 1086,
+      "medianInferenceMs": 1118
+    },
+    {
+      "config": "llm:qwen2.5:3b@unranked",
+      "distractors": 50,
+      "n": 10,
+      "correct": 7,
+      "correctRate": {
+        "estimate": 0.7,
+        "low": 0.3967781453459709,
+        "high": 0.892208733443606,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 1262,
+      "medianInferenceMs": 1116
+    },
+    {
+      "config": "llm:qwen2.5:3b@unranked",
+      "distractors": 150,
+      "n": 10,
+      "correct": 7,
+      "correctRate": {
+        "estimate": 0.7,
+        "low": 0.3967781453459709,
+        "high": 0.892208733443606,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 1262,
+      "medianInferenceMs": 998
+    },
+    {
+      "config": "llm:qwen2.5:3b@unranked",
+      "distractors": 300,
+      "n": 10,
+      "correct": 7,
+      "correctRate": {
+        "estimate": 0.7,
+        "low": 0.3967781453459709,
+        "high": 0.892208733443606,
+        "n": 10
+      },
+      "wrong": 0,
+      "inputTokensPerCall": 1262,
+      "medianInferenceMs": 1036
+    }
+  ],
+  "settle": [
+    {
+      "settleMs": 0,
+      "run": "s4f-settle0",
+      "recoveredReplays": 9,
+      "recoveredReplayMedianMs": 11813,
+      "deterministicFailurePathMedianMs": 10233,
+      "dynamicMissedByDeterministic": [
+        "dynamic-delayed-renamed"
+      ],
+      "llmGoalMet": "19/19",
+      "wrong": 0
+    },
+    {
+      "settleMs": 1500,
+      "run": "s4f-settle1500",
+      "recoveredReplays": 9,
+      "recoveredReplayMedianMs": 3280,
+      "deterministicFailurePathMedianMs": 1715.5,
+      "dynamicMissedByDeterministic": [
+        "dynamic-delayed-silent",
+        "dynamic-delayed-renamed",
+        "dynamic-spa-slow-silent",
+        "dynamic-delayed-silent-long"
+      ],
+      "llmGoalMet": "16/19",
+      "wrong": 0
+    },
+    {
+      "settleMs": 3000,
+      "run": "s4f-settle3000",
+      "recoveredReplays": 9,
+      "recoveredReplayMedianMs": 4856,
+      "deterministicFailurePathMedianMs": 3202,
+      "dynamicMissedByDeterministic": [
+        "dynamic-delayed-renamed",
+        "dynamic-delayed-silent-long"
+      ],
+      "llmGoalMet": "18/19",
+      "wrong": 0
+    }
+  ]
+}

@@ -1,0 +1,394 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "structural-classes",
+    "category": "structural",
+    "title": "Every CSS class renamed",
+    "rationale": "A redesign renames all classes. Role, name and label are unchanged, so the same button is still the right one.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "rename-classes"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "structural-ids",
+    "category": "structural",
+    "title": "Field ids renamed",
+    "rationale": "The keyword and city fields get new ids (labels and form names unchanged).",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "rename-ids"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "structural-wrapper",
+    "category": "structural",
+    "title": "Search button wrapped and moved",
+    "rationale": "The button moves to the top of the form inside two new wrappers.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "wrap-search-button"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "structural-reordered-form",
+    "category": "structural",
+    "title": "Form fields reordered",
+    "rationale": "The keyword field moves after the city and contract filters.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "reorder-search-form"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "structural-result-wrappers",
+    "category": "structural",
+    "title": "Result cards wrapped",
+    "rationale": "Each result card gets two extra container levels.",
+    "workflow": {
+      "id": "open-offer",
+      "gestures": [
+        {
+          "goto": "/results.html?q=data&ville="
+        },
+        {
+          "click": {
+            "role": "link",
+            "name": "Data engineer junior"
+          }
+        },
+        {
+          "waitForUrl": "offer\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "wrap-results"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Data engineer junior",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "offer\\.html\\?id=data-paris"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "structural-results-reversed",
+    "category": "structural",
+    "title": "Results in reverse order",
+    "rationale": "The result list is sorted differently; the recorded offer is elsewhere in the list.",
+    "workflow": {
+      "id": "open-offer",
+      "gestures": [
+        {
+          "goto": "/results.html?q=data&ville="
+        },
+        {
+          "click": {
+            "role": "link",
+            "name": "Data engineer junior"
+          }
+        },
+        {
+          "waitForUrl": "offer\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "reverse-results"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Data engineer junior",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "offer\\.html\\?id=data-paris"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "structural-filter-classes",
+    "category": "structural",
+    "title": "Filter checkboxes restyled",
+    "rationale": "Contract checkboxes keep their labels but every class changes.",
+    "workflow": {
+      "id": "filter",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "check": {
+            "label": "CDI"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "rename-classes"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "CDI",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "contrat=CDI"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "structural-apply-moved",
+    "category": "structural",
+    "title": "Apply button moved to an actions panel",
+    "rationale": "The irreversible « Postuler » button moves into a new aside. Completing still needs the user's confirmation.",
+    "workflow": {
+      "id": "apply",
+      "gestures": [
+        {
+          "goto": "/offer.html?id=data-paris&q=data&ville="
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Postuler",
+            "exact": true
+          }
+        }
+      ]
+    },
+    "mutations": [
+      "move-apply-button"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Postuler",
+      "human": "required",
+      "success": [
+        {
+          "type": "visible",
+          "selector": "#apply-form"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ]
+  }
+]

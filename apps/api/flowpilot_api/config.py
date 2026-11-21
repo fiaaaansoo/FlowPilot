@@ -54,6 +54,11 @@ def _flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes"}
 
 
+def _enabled(name: str) -> bool:
+    """On unless explicitly set to "off"."""
+    return os.environ.get(name, "on").strip().lower() != "off"
+
+
 @dataclass(frozen=True)
 class Settings:
     api_token: str
@@ -65,6 +70,8 @@ class Settings:
     model: str | None = None
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_num_ctx: int = 4096
+    #: How long Ollama keeps the model loaded after a call (Ollama's own default is 5m).
+    ollama_keep_alive: str = "5m"
     openai_base_url: str | None = None
     openai_api_key: str | None = None
     openai_is_local: bool = True
@@ -73,6 +80,13 @@ class Settings:
     llm_max_retries: int = 1
     context_max_elements: int = 12
     context_max_chars: int = 6_000
+    #: Evaluation knobs (Sprint 4). Defaults are the production behaviour.
+    #: Ranked context (relevance order) or raw page order before truncation.
+    context_ranking: bool = True
+    #: Verified-correction memory: lookup before recovery and storage after a verified outcome.
+    memory_enabled: bool = True
+    #: Prompt template version (see prompts/).
+    prompt_version: str = "recovery-v1"
     db_path: Path = field(default_factory=lambda: Path(".data/flowpilot.sqlite3"))
     mock_rules: dict[str, str] = field(default_factory=dict)
     mock_delay_ms: int = 0
@@ -135,6 +149,10 @@ def load_settings(env_file: Path | None = None) -> Settings:
         llm_max_retries=_int("FLOWPILOT_LLM_MAX_RETRIES", 1),
         context_max_elements=_int("FLOWPILOT_CONTEXT_MAX_ELEMENTS", 12),
         context_max_chars=_int("FLOWPILOT_CONTEXT_MAX_CHARS", 6_000),
+        context_ranking=_enabled("FLOWPILOT_CONTEXT_RANKING"),
+        memory_enabled=_enabled("FLOWPILOT_MEMORY"),
+        prompt_version=_prompt_version(),
+        ollama_keep_alive=os.environ.get("FLOWPILOT_OLLAMA_KEEP_ALIVE", "5m"),
         db_path=Path(os.environ.get("FLOWPILOT_DB_PATH", ".data/flowpilot.sqlite3")),
         mock_rules=rules,
         mock_delay_ms=_int("FLOWPILOT_MOCK_DELAY_MS", 0),
@@ -164,3 +182,12 @@ def _require_price(provider: str, model: str | None, local: bool, price_in: str 
         f"No price is known for model {model or '(default)'} of provider {provider}: set "
         "FLOWPILOT_PRICE_INPUT_PER_MTOK and FLOWPILOT_PRICE_OUTPUT_PER_MTOK so the cost budget can be enforced."
     )
+
+
+def _prompt_version() -> str:
+    from .prompts import DEFAULT_PROMPT_VERSION, PROMPTS
+
+    version = os.environ.get("FLOWPILOT_PROMPT_VERSION", DEFAULT_PROMPT_VERSION).strip()
+    if version not in PROMPTS:
+        raise ConfigError(f"FLOWPILOT_PROMPT_VERSION must be one of {', '.join(PROMPTS)}")
+    return version
