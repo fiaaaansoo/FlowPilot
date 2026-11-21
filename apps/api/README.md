@@ -9,7 +9,7 @@ FlowPilot works without this backend (deterministic record and replay). Without 
 ```bash
 cd apps/api
 python -m venv .venv
-.venv/Scripts/python -m pip install -e ".[dev]"      # Windows; use .venv/bin/python on Linux/macOS
+.venv/Scripts/python -m pip install -e ".[dev,anthropic]"   # Windows; use .venv/bin/python on Linux/macOS
 cp .env.example .env
 .venv/Scripts/python -m flowpilot_api token          # paste into FLOWPILOT_API_TOKEN in .env
 

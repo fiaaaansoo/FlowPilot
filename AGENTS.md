@@ -68,7 +68,7 @@ npm run check                   # lint + typecheck + test + build (= CI job "che
 npm run bench                   # recovery benchmark (FLOWPILOT_BENCH_OLLAMA_MODEL=qwen2.5:3b for the local model)
 
 cd apps/api                     # backend (Python 3.11+; verified with 3.14)
-python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]"
+python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev,anthropic]"
 .venv/Scripts/python -m ruff check . && .venv/Scripts/python -m ruff format --check .
 .venv/Scripts/python -m pytest  # 69 tests, no model, no network
 .venv/Scripts/python -m flowpilot_api serve   # needs FLOWPILOT_API_TOKEN (see apps/api/.env.example)
