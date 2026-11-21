@@ -82,6 +82,19 @@ def test_ollama_unreachable_and_unconfigured() -> None:
         OllamaProvider(base_url="http://ollama", model="")
 
 
+def test_provider_errors_never_echo_url_credentials() -> None:
+    def refuse(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused")
+
+    provider = OllamaProvider(
+        base_url="http://user:s3cr3t@ollama:11434", model="qwen2.5:3b", transport=httpx.MockTransport(refuse)
+    )
+    with pytest.raises(ProviderError) as error:
+        provider.complete(system="s", messages=MESSAGES, schema=ACTION_SCHEMA, timeout_s=5)
+    assert "s3cr3t" not in str(error.value)
+    assert "ollama:11434" in str(error.value)
+
+
 # --- OpenAI-compatible (llama.cpp, vLLM, LM Studio) ----------------------------------
 
 
