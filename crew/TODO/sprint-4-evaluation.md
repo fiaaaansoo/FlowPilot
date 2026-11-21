@@ -1,10 +1,10 @@
-# Sprint 4 — Fiabilité et évaluation
+# Sprint 4 — Reliability and evaluation
 
-Zone : apps/demo-site/, apps/api/evaluation/, tests/, docs/
+Zone: apps/demo-site/, apps/api/flowpilot_api/evaluation/, tests/, docs/
 
-Dépend de : sprint-3-agent-recovery.
+Depends on: sprint-3-agent-recovery.
 
-- [ ] Variantes d'interface du site de démo (ids, libellés, ordre modifiés) pour scénarios de changement d'UI
-- [ ] Comparaison Baseline A (déterministe) / B (récupération LLM) / C (LLM + mémoire des corrections)
-- [ ] Mesures : taux de réussite, récupération, décisions incorrectes, latence, requêtes/tokens, coût, validations humaines
-- [ ] Journalisation, documentation technique, vidéo de démonstration
+- [ ] Larger set of demo-site interface variations (ids, labels, ordering, layout) for UI-change scenarios
+- [ ] Full comparison: baseline A (deterministic), B (LLM recovery), C (LLM recovery + correction memory), across several local and hosted models
+- [ ] Metrics: success rate, recovery rate, incorrect decisions, latency, requests and tokens, cost, human validations
+- [ ] Logging, technical documentation, demonstration video
