@@ -168,6 +168,24 @@ function emptyCounts(): Record<Verdict, number> {
   return Object.fromEntries(VERDICTS.map((v) => [v, 0])) as Record<Verdict, number>;
 }
 
+/**
+ * The part of a confirmation prompt that names the element FlowPilot is about to act on. An AI
+ * proposal reads "… FlowPilot propose « X » (button), dans « … » …": only what follows "propose"
+ * is the proposal (the text before it quotes the recorded step). A plain confirmation of a
+ * recorded step names that step's own element.
+ */
+export function proposedPart(promptText: string): string {
+  const index = promptText.indexOf('FlowPilot propose');
+  if (index === -1) return promptText;
+  const rest = promptText.slice(index + 'FlowPilot propose'.length);
+  // Stop before the strategy and the model's rationale: the rationale is untrusted model text
+  // and may quote any label.
+  const ends = [' (modèle de langage', ' (correspondance sémantique', ' (correction mémorisée', 'Justification du modèle']
+    .map((marker) => rest.indexOf(marker))
+    .filter((i) => i >= 0);
+  return ends.length ? rest.slice(0, Math.min(...ends)) : rest;
+}
+
 /** Does a proposal (as shown to the user) name the ground-truth element (and its row or section, when given)? */
 export function proposalMatches(proposal: string, target: string, context?: string): boolean {
   return proposal.includes(`« ${target} »`) && (context === undefined || proposal.includes(context));

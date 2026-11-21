@@ -5,6 +5,8 @@ import {
   mcnemarExact,
   median,
   parseResults,
+  proposalMatches,
+  proposedPart,
   quantile,
   stdev,
   summarize,
@@ -113,6 +115,19 @@ function attempt(overrides: Partial<AttemptRecord>): AttemptRecord {
     ...overrides,
   };
 }
+
+describe('simulated user', () => {
+  it('judges only the proposed element, not the recorded step quoted before it', () => {
+    const prompt = 'Cliquer sur « Rechercher » : l’élément enregistré a changé. FlowPilot propose « CDI » (checkbox), dans « Type de contrat »';
+    expect(proposalMatches(proposedPart(prompt), 'Rechercher')).toBe(false);
+    expect(proposalMatches(proposedPart(prompt), 'CDI', 'Type de contrat')).toBe(true);
+    // The model's rationale is untrusted and may quote the right label: it is not part of the proposal.
+    const tricky = `${prompt} (modèle de langage, confiance 90 %).Justification du modèle, non vérifiée : better than « Rechercher »`;
+    expect(proposalMatches(proposedPart(tricky), 'Rechercher')).toBe(false);
+    // A plain confirmation of a recorded irreversible step names that step's element.
+    expect(proposalMatches(proposedPart('Cliquer sur « Postuler » : cette action peut être irréversible.'), 'Postuler')).toBe(true);
+  });
+});
 
 describe('aggregation', () => {
   const records = [

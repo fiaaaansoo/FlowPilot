@@ -54,3 +54,4 @@ apps/api/*.egg-info/
 
 # Benchmark output
 bench-results/
+eval-results/
