@@ -1,6 +1,6 @@
 {
   "name": "flowpilot-recovery-benchmark",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "schemaVersion": 1,
   "files": [
     "structural.json",

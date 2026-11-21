@@ -40,7 +40,7 @@
       "success": [
         {
           "type": "url",
-          "pattern": "results\\.html\\?q=data"
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
         }
       ]
     },
@@ -100,7 +100,7 @@
       "success": [
         {
           "type": "url",
-          "pattern": "results\\.html\\?q=data"
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
         }
       ]
     },
@@ -164,7 +164,7 @@
       "success": [
         {
           "type": "url",
-          "pattern": "results\\.html\\?q=data"
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
         }
       ]
     },
@@ -225,7 +225,7 @@
       "success": [
         {
           "type": "url",
-          "pattern": "results\\.html\\?q=data"
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
         }
       ]
     },
@@ -289,7 +289,7 @@
       "success": [
         {
           "type": "url",
-          "pattern": "results\\.html\\?q=data"
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
         }
       ]
     },
@@ -350,7 +350,7 @@
       "success": [
         {
           "type": "url",
-          "pattern": "results\\.html\\?q=data"
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
         }
       ]
     },

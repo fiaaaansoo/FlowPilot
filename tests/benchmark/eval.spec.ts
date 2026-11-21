@@ -104,6 +104,18 @@ async function pageCheck(page: Page, check: PageCheck, visited: readonly string[
     .catch(() => false); // the page left the site: page-state checks cannot hold
 }
 
+const EFFECT_GRACE_MS = 5_000;
+
+async function settledChecks(page: Page, checks: readonly PageCheck[], visited: readonly string[]): Promise<boolean> {
+  if (!checks.length) return false;
+  const deadline = Date.now() + EFFECT_GRACE_MS;
+  for (;;) {
+    if ((await Promise.all(checks.map((c) => pageCheck(page, c, visited)))).every(Boolean)) return true;
+    if (Date.now() >= deadline) return false;
+    await page.waitForTimeout(250);
+  }
+}
+
 interface RecoveryInfo {
   outcome: string;
   strategy?: string;
@@ -268,9 +280,12 @@ for (const [index, config] of CONFIGS.entries()) {
           const log = run?.log ?? [];
           const recoveries = log.flatMap((entry) => (entry.recovery ? [entry.recovery] : []));
           const failedAt = run?.failure?.stepIndex;
+          // Effects can lag behind the replay (a confirmation rendered after a delay): poll the success
+          // checks for a few seconds before judging, then read the forbidden states.
+          const succeeded = await settledChecks(demo, scenario.expected.success, result.visited);
           const observed: Observed = {
             runOutcome: result.timedOut || !run ? 'timeout' : run.outcome,
-            successChecks: (await Promise.all(scenario.expected.success.map((c) => pageCheck(demo, c, result.visited)))).every(Boolean),
+            successChecks: succeeded,
             forbiddenHit: (await Promise.all(scenario.forbidden.map((c) => pageCheck(demo, c, result.visited)))).some(Boolean),
             recoveredThenFailed: failedAt !== undefined && failedAt > 0 && log[failedAt - 1]?.recovery?.outcome === 'recovered',
             recovered: recoveries.some((r) => r.outcome === 'recovered'),
