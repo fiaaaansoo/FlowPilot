@@ -16,6 +16,8 @@
  */
 import {
   PROTOCOL_VERSION,
+  RECORDER_HEARTBEAT_MS,
+  RECORDER_PORT,
   fail,
   isContentRequest,
   ok,
@@ -37,9 +39,51 @@ const capture = new InteractionCapture(document, (event: PageEvent) => {
   const message: ContentEventMessage = { type: 'recorder/event', event };
   chrome.runtime.sendMessage(message).catch(() => {
     // Extension rechargée ou service worker indisponible : ce script est orphelin.
-    capture.stop();
+    stopCapture();
   });
 });
+
+/**
+ * While recording, a port keeps the service worker alive; if Chrome stops it anyway, the
+ * disconnection is seen here and the worker is woken at once. Without it, an event sent to a
+ * stopped worker by a page that is unloading (a click that navigates) is lost.
+ */
+let workerPort: chrome.runtime.Port | null = null;
+let heartbeat: ReturnType<typeof setInterval> | undefined;
+
+function holdWorker(): void {
+  releaseWorker();
+  try {
+    workerPort = chrome.runtime.connect({ name: RECORDER_PORT });
+  } catch {
+    capture.stop(); // extension reloaded: this script is orphaned
+    return;
+  }
+  workerPort.onDisconnect.addListener(() => {
+    workerPort = null;
+    clearInterval(heartbeat);
+    // Short delay: never a tight reconnection loop.
+    if (capture.active) setTimeout(() => capture.active && workerPort === null && holdWorker(), 100);
+  });
+  heartbeat = setInterval(() => workerPort?.postMessage({ type: 'heartbeat' }), RECORDER_HEARTBEAT_MS);
+}
+
+function releaseWorker(): void {
+  clearInterval(heartbeat);
+  const port = workerPort;
+  workerPort = null;
+  port?.disconnect();
+}
+
+function startCapture(): void {
+  capture.start();
+  holdWorker();
+}
+
+function stopCapture() {
+  releaseWorker();
+  return capture.stop();
+}
 
 type Reply = ContentPong | RecordAck | PerformResponse | Observation;
 
@@ -51,7 +95,7 @@ let currentAction: AbortController | null = null;
 const hello: ContentHello = { type: 'content/hello' };
 chrome.runtime.sendMessage(hello).then(
   (reply: unknown) => {
-    if (typeof reply === 'object' && reply !== null && (reply as { recording?: unknown }).recording === true) capture.start();
+    if (typeof reply === 'object' && reply !== null && (reply as { recording?: unknown }).recording === true) startCapture();
   },
   () => undefined,
 );
@@ -64,10 +108,10 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse: (r
       return false;
     case 'content/record':
       if (message.recording) {
-        capture.start();
+        startCapture();
         sendResponse({ type: 'content/record-ack', flushed: [] });
       } else {
-        sendResponse({ type: 'content/record-ack', flushed: capture.stop() });
+        sendResponse({ type: 'content/record-ack', flushed: stopCapture() });
       }
       return false;
     case 'content/perform': {

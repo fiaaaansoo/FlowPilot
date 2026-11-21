@@ -148,6 +148,9 @@ test.describe('Service worker lifecycle', () => {
     await demo.getByLabel('Mots-clés').blur();
     await demo.waitForTimeout(500);
     await stopServiceWorkers(await context.newCDPSession(demo));
+    // A human pause between two interactions. The click then leaves the page at once: an event
+    // sent to a stopped worker by a page that is unloading would be lost.
+    await demo.waitForTimeout(1_000);
     await demo.getByRole('button', { name: 'Rechercher' }).click();
     await expect(demo).toHaveURL(/results\.html\?q=python/);
     await demo.waitForTimeout(500);

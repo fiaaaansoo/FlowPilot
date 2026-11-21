@@ -6,7 +6,7 @@
  * condition pour que Chrome réveille le worker sur ces événements (le worker
  * peut être arrêté entre deux interactions d'un enregistrement).
  */
-import { fail, isCommand, isContentHello, parseContentEvent, type CommandResponse, type ContentHelloReply } from '@flowpilot/shared';
+import { RECORDER_PORT, fail, isCommand, isContentHello, parseContentEvent, type CommandResponse, type ContentHelloReply } from '@flowpilot/shared';
 import { chromeArea } from '../storage/area';
 import { RunStore } from '../storage/run-store';
 import { SessionStore } from '../storage/session-store';
@@ -60,6 +60,16 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse: Re
     sendResponse(fail('INTERNAL', 'Erreur interne de l’extension.'));
   });
   return true; // réponse asynchrone
+});
+
+// Port of the recorded tab's content script: its heartbeat keeps this worker alive during a
+// recording (see `RECORDER_PORT`). It carries no command; anything else is closed.
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== RECORDER_PORT || port.sender === undefined || !isFromContentScript(port.sender)) {
+    port.disconnect();
+    return;
+  }
+  port.onMessage.addListener(() => undefined);
 });
 
 // Navigations de l'onglet enregistré. `changeInfo.url` n'est fourni que pour

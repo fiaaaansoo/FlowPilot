@@ -18,6 +18,14 @@ import type { ElementStep } from './workflow.js';
 
 export const PROTOCOL_VERSION = 2 as const;
 
+/**
+ * Port held by the content script of the recorded tab: it keeps the service worker
+ * alive during a recording, and its disconnection tells the page the worker stopped.
+ */
+export const RECORDER_PORT = 'flowpilot.recorder';
+/** Heartbeat interval on that port, below the ~30 s after which Chrome stops an idle worker. */
+export const RECORDER_HEARTBEAT_MS = 20_000;
+
 export type Command =
   | { type: 'session/get' }
   | { type: 'record/start' }
