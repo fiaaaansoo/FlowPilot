@@ -222,6 +222,14 @@ describe('waitForTarget — adaptive settle (Sprint 4)', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('a loading indicator that is present but hidden does not hold the wait until the timeout', async () => {
+    document.body.insertAdjacentHTML('beforeend', '<div role="progressbar" style="display: none"></div><div aria-busy="true" aria-hidden="true"></div>');
+    const started = Date.now();
+    const result = await waitForTarget(late, 3_000, document, 10, undefined, 100);
+    expect(result.ok).toBe(false);
+    expect(Date.now() - started).toBeLessThan(1_500);
+  });
+
   it('documents the trade-off: an element added after a silent pause longer than the settle window is missed', async () => {
     setTimeout(insertLate, 500);
     const result = await waitForTarget(late, 3_000, document, 10, undefined, 100);

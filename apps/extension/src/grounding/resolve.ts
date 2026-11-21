@@ -213,7 +213,7 @@ export async function waitForTarget(
     observer !== null &&
     now - lastChange >= settleMs &&
     (doc?.readyState ?? 'complete') === 'complete' &&
-    !Array.from((doc ?? document).querySelectorAll(LOADING)).some((el) => !el.closest('[hidden]'));
+    !Array.from((doc ?? document).querySelectorAll(LOADING)).some(isVisible);
   try {
     for (;;) {
       if (signal?.aborted) return fail('NAVIGATION_FAILED', 'Exécution arrêtée.');
