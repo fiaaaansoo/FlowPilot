@@ -1,13 +1,36 @@
-import { errorMessage, fail, type Result, type RunSummary, type Workflow, type WorkflowStep } from '@flowpilot/shared';
+import {
+  errorMessage,
+  fail,
+  needsHuman,
+  type ElementStep,
+  type Result,
+  type RunSummary,
+  type StepLog,
+  type Workflow,
+  type WorkflowStep,
+} from '@flowpilot/shared';
 
 /**
  * Moteur d'exécution séquentiel, indépendant de Chrome et de tout LLM.
  * Les effets concrets passent par un `StepDriver` (Chrome en production,
  * faux driver en test). Le Recovery Agent (Sprint 3) s'insérera entre l'échec
- * d'une étape et l'arrêt du run, sans toucher à cette boucle.
+ * d'une étape et l'arrêt du run, derrière la même interface.
  */
 export interface StepDriver {
   navigate(url: string, signal: AbortSignal): Promise<Result<void>>;
+  /** Attend que l'onglet atteigne `url` (navigation déclenchée par l'étape précédente). */
+  waitForNavigation(url: string, signal: AbortSignal): Promise<Result<void>>;
+  /**
+   * Localise la cible dans la page et exécute l'action ; renvoie la stratégie de grounding.
+   * `confirmed` : un humain a validé l'étape ; sinon la page refuse (`CONFIRMATION_REQUIRED`)
+   * une action qu'elle juge irréversible sur l'élément effectivement trouvé.
+   */
+  perform(step: ElementStep, signal: AbortSignal, confirmed: boolean): Promise<Result<{ strategy: string }>>;
+  /**
+   * Attend l'intervention humaine (confirmation ou saisie manuelle) sur l'étape.
+   * `false` si le run est arrêté entre-temps.
+   */
+  requestHuman(stepIndex: number, signal: AbortSignal): Promise<boolean>;
 }
 
 export interface RunOptions {
@@ -16,10 +39,43 @@ export interface RunOptions {
   onStepStart?: (stepIndex: number) => void | Promise<void>;
 }
 
+type StepResult = Result<{ strategy?: string }>;
+type Handler<S extends WorkflowStep> = (step: S, driver: StepDriver, signal: AbortSignal, confirmed: boolean) => Promise<StepResult>;
+type StepHandlers = { [K in WorkflowStep['kind']]: Handler<Extract<WorkflowStep, { kind: K }>> };
+
+const withoutStrategy = async (result: Promise<Result<void>>): Promise<StepResult> => {
+  const r = await result;
+  return r.ok ? { ok: true, value: {} } : r;
+};
+
+const perform: Handler<ElementStep> = (step, driver, signal, confirmed) => driver.perform(step, signal, confirmed);
+
+/** Un handler par type d'étape : ajouter un `kind` au schéma impose d'ajouter son handler (erreur de compilation sinon). */
+const HANDLERS: StepHandlers = {
+  navigate: (step, driver, signal) => withoutStrategy(driver.navigate(step.url, signal)),
+  waitForNavigation: (step, driver, signal) => withoutStrategy(driver.waitForNavigation(step.url, signal)),
+  click: perform,
+  input: perform,
+  manualInput: perform,
+  select: perform,
+  check: perform,
+  press: perform,
+  submit: perform,
+};
+
+const runHandler = (step: WorkflowStep, driver: StepDriver, signal: AbortSignal, confirmed: boolean): Promise<StepResult> =>
+  (HANDLERS[step.kind] as Handler<WorkflowStep>)(step, driver, signal, confirmed);
+
+/** Lecture fraîche du signal (il peut changer pendant un `await`, ce que le flux de types ignore). */
+const isAborted = (signal: AbortSignal): boolean => signal.aborted;
+
+/** Exécute le workflow. Ne rejette jamais : toute exception devient un échec d'étape. */
 export async function runWorkflow(workflow: Workflow, driver: StepDriver, options: RunOptions): Promise<RunSummary> {
   const { signal, now, onStepStart } = options;
   const startedAt = now();
   const totalSteps = workflow.steps.length;
+  const log: StepLog[] = [];
+
   const summary = (outcome: RunSummary['outcome'], stepsCompleted: number, failure?: RunSummary['failure']): RunSummary => ({
     workflowId: workflow.id,
     outcome,
@@ -28,39 +84,48 @@ export async function runWorkflow(workflow: Workflow, driver: StepDriver, option
     stepsCompleted,
     totalSteps,
     ...(failure ? { failure } : {}),
+    log,
   });
+  const record = (stepIndex: number, step: WorkflowStep, stepStart: number, entry: Partial<StepLog> = {}) => {
+    log.push({ stepIndex, kind: step.kind, status: 'succeeded', startedAt: stepStart, finishedAt: now(), ...entry });
+  };
+  const abortAt = (index: number, step: WorkflowStep, stepStart: number) => {
+    record(index, step, stepStart, { status: 'aborted' });
+    return summary('aborted', index);
+  };
 
   for (const [index, step] of workflow.steps.entries()) {
     if (isAborted(signal)) return summary('aborted', index);
-    // Aucune exception ne sort de la boucle : runWorkflow renvoie toujours un résumé.
-    let result: Result<void>;
+    const stepStart = now();
+
+    let result: StepResult;
     try {
       await onStepStart?.(index);
-      if (isAborted(signal)) return summary('aborted', index);
-      result = await HANDLERS[step.kind](step, driver, signal);
+      if (isAborted(signal)) return abortAt(index, step, stepStart);
+      let confirmed = needsHuman(step);
+      if (confirmed && !(await driver.requestHuman(index, signal))) return abortAt(index, step, stepStart);
+      if (isAborted(signal)) return abortAt(index, step, stepStart);
+      result = await runHandler(step, driver, signal, confirmed);
+      // La page juge l'élément trouvé irréversible alors que l'étape n'était pas marquée :
+      // on demande l'accord humain, puis on réessaie une seule fois.
+      if (!result.ok && result.error.code === 'CONFIRMATION_REQUIRED' && !confirmed) {
+        if (!(await driver.requestHuman(index, signal))) return abortAt(index, step, stepStart);
+        confirmed = true;
+        result = await runHandler(step, driver, signal, confirmed);
+      }
     } catch (error) {
       result = fail('INTERNAL', errorMessage(error));
     }
 
     if (!result.ok) {
       // Un échec provoqué par l'arrêt n'est pas une erreur de l'étape.
-      if (isAborted(signal)) return summary('aborted', index);
+      if (isAborted(signal)) return abortAt(index, step, stepStart);
+      record(index, step, stepStart, { status: 'failed', code: result.error.code, message: result.error.message });
       return summary('failed', index, { stepIndex: index, ...result.error });
     }
+    record(index, step, stepStart, result.value.strategy ? { strategy: result.value.strategy } : {});
     if (isAborted(signal)) return summary('aborted', index + 1);
   }
 
   return summary('succeeded', totalSteps);
 }
-
-type StepHandlers = {
-  [K in WorkflowStep['kind']]: (step: Extract<WorkflowStep, { kind: K }>, driver: StepDriver, signal: AbortSignal) => Promise<Result<void>>;
-};
-
-/** Un handler par type d'étape : ajouter un `kind` au schéma impose d'ajouter son handler (erreur de compilation sinon). */
-const HANDLERS: StepHandlers = {
-  navigate: (step, driver, signal) => driver.navigate(step.url, signal),
-};
-
-/** Lecture fraîche du signal (il peut changer pendant un `await`, ce que le flux de types ignore). */
-const isAborted = (signal: AbortSignal): boolean => signal.aborted;

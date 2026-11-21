@@ -51,6 +51,27 @@ describe('transition', () => {
   });
 });
 
+describe('intervention humaine', () => {
+  it('met le replay en pause puis le reprend sur la même étape', () => {
+    const paused = transition(replaying, { type: 'HUMAN_REQUESTED', stepIndex: 3 });
+    expect(paused).toEqual({ ok: true, value: { ...replaying, stepIndex: 3, awaitingHuman: true } });
+    if (!paused.ok) return;
+    expect(transition(paused.value, { type: 'HUMAN_RESOLVED' })).toEqual({ ok: true, value: { ...replaying, stepIndex: 3 } });
+    expect(transition(paused.value, { type: 'HUMAN_REQUESTED', stepIndex: 3 }).ok).toBe(false);
+    expect(transition(paused.value, { type: 'STOPPED' })).toEqual({ ok: true, value: IDLE });
+  });
+
+  it('refuse une reprise sans attente, et hors replay', () => {
+    expect(transition(replaying, { type: 'HUMAN_RESOLVED' }).ok).toBe(false);
+    expect(transition(recording, { type: 'HUMAN_REQUESTED', stepIndex: 0 }).ok).toBe(false);
+  });
+
+  it('relit l’attente depuis le stockage', () => {
+    expect(parseSession({ ...replaying, awaitingHuman: true })).toEqual({ ...replaying, awaitingHuman: true });
+    expect(parseSession({ ...replaying, awaitingHuman: 'oui' })).toEqual(replaying);
+  });
+});
+
 describe('availableCommands', () => {
   it('au repos : enregistrer, rejouer seulement si un workflow existe', () => {
     expect(availableCommands(IDLE, false)).toEqual({ canRecord: true, canStop: false, canReplay: false });

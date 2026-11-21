@@ -4,4 +4,5 @@ export * from './origin.js';
 export * from './session.js';
 export * from './workflow.js';
 export * from './run.js';
+export * from './recording.js';
 export * from './messages.js';

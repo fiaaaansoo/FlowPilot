@@ -1,0 +1,206 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { PageEvent } from '@flowpilot/shared';
+import { InteractionCapture } from './capture';
+import { isIrreversibleAction, isSensitiveField } from './classify';
+
+/**
+ * jsdom ne produit que des événements `isTrusted: false` (non redéfinissable).
+ * Les tests marquent les « gestes réels » simulés ; les autres restent non fiables.
+ */
+const TRUSTED = new WeakSet<Event>();
+function trusted<E extends Event>(event: E): E {
+  TRUSTED.add(event);
+  return event;
+}
+
+const click = (el: Element) => el.dispatchEvent(trusted(new MouseEvent('click', { bubbles: true, cancelable: true })));
+const type = (el: HTMLInputElement, value: string) => {
+  el.value = value;
+  el.dispatchEvent(trusted(new Event('input', { bubbles: true })));
+};
+const change = (el: Element) => el.dispatchEvent(trusted(new Event('change', { bubbles: true })));
+
+let events: PageEvent[];
+let capture: InteractionCapture;
+let clock = 0;
+
+const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector(selector) as T;
+
+beforeEach(() => {
+  document.body.innerHTML = `
+    <form id="search">
+      <label for="q">Mots-clés</label><input id="q" name="q" type="text" />
+      <label><input type="checkbox" name="cdi" value="CDI" /> CDI</label>
+      <select name="ville"><option value="">Toutes</option><option value="Lyon">Lyon</option></select>
+      <button type="submit">Rechercher</button>
+    </form>
+    <form id="login">
+      <label for="pwd">Mot de passe</label><input id="pwd" type="password" />
+      <label for="card">Numéro de carte</label><input id="card" autocomplete="cc-number" />
+      <div data-flowpilot-sensitive><label for="note">Note</label><input id="note" /></div>
+      <button type="submit">Payer</button>
+    </form>
+    <p id="texte">Du texte sans action</p>
+  `;
+  events = [];
+  clock = 0;
+  capture = new InteractionCapture(document, (event) => events.push(event), () => ++clock, (event) => TRUSTED.has(event));
+  capture.start();
+});
+
+afterEach(() => {
+  capture.stop();
+});
+
+describe('InteractionCapture', () => {
+  it('enregistre saisie, case, liste et clic dans l’ordre', () => {
+    type($('#q'), 'data');
+    change($('#q'));
+    const box = $<HTMLInputElement>('input[name="cdi"]');
+    box.checked = true;
+    change(box);
+    const select = $<HTMLSelectElement>('select');
+    select.value = 'Lyon';
+    change(select);
+    click($('#search button'));
+    expect(events.map((e) => e.kind)).toEqual(['input', 'check', 'select', 'click']);
+    expect(events[0]).toMatchObject({ kind: 'input', value: 'data', target: { name: 'Mots-clés' } });
+    expect(events[1]).toMatchObject({ kind: 'check', checked: true });
+    expect(events[2]).toMatchObject({ kind: 'select', value: 'Lyon', label: 'Lyon' });
+    expect(events[3]).toMatchObject({ kind: 'click', target: { name: 'Rechercher' } });
+  });
+
+  it('ignore les événements fabriqués par la page (isTrusted false)', () => {
+    $('#search button').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(events).toEqual([]);
+  });
+
+  it('ignore les clics de mise au focus, sur une case ou son label, et hors élément interactif', () => {
+    click($('#q'));
+    click($('label[for="q"]'));
+    click($('input[name="cdi"]'));
+    click($('#texte'));
+    expect(events).toEqual([]);
+  });
+
+  it('vide une saisie non validée avant un clic qui peut quitter la page', () => {
+    type($('#q'), 'en cours');
+    click($('#search button'));
+    expect(events.map((e) => e.kind)).toEqual(['input', 'click']);
+  });
+
+  it('renvoie les saisies en attente à l’arrêt', () => {
+    type($('#q'), 'pas validé');
+    expect(capture.stop()).toMatchObject([{ kind: 'input', value: 'pas validé' }]);
+  });
+
+  it('ne lit jamais la valeur d’un champ sensible : étape de saisie manuelle', () => {
+    for (const selector of ['#pwd', '#card', '#note']) {
+      type($(selector), '4111 1111 1111 1111');
+      change($(selector));
+    }
+    expect(events.map((e) => e.kind)).toEqual(['manualInput', 'manualInput', 'manualInput']);
+    expect(JSON.stringify(events)).not.toContain('4111');
+  });
+
+  it('marque les actions irréversibles pour confirmation au replay', () => {
+    click($('#login button'));
+    expect(events[0]).toMatchObject({ kind: 'click', confirm: true });
+    click($('#search button'));
+    expect(events[1]).not.toHaveProperty('confirm');
+  });
+
+  it('soumission par Entrée : « submit » sans bouton, clic du bouton par défaut sinon, jamais en double', () => {
+    const form = $<HTMLFormElement>('#search');
+    const button = $('#search button');
+    form.dispatchEvent(trusted(new SubmitEvent('submit', { bubbles: true, submitter: null })));
+    // Entrée avec bouton d'envoi, sans clic capturé : le clic est enregistré depuis le submit.
+    form.dispatchEvent(trusted(new SubmitEvent('submit', { bubbles: true, submitter: button })));
+    // Clic réel sur le bouton puis submit : un seul clic.
+    click(button);
+    form.dispatchEvent(trusted(new SubmitEvent('submit', { bubbles: true, submitter: button })));
+    expect(events.map((e) => e.kind)).toEqual(['submit', 'click', 'click']);
+  });
+
+  it('une liste sensible devient une saisie manuelle, sans valeur', () => {
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<label for="exp">Mois d’expiration</label><select id="exp" autocomplete="cc-exp-month"><option value="">--</option><option value="07">07</option></select>',
+    );
+    const select = $<HTMLSelectElement>('#exp');
+    select.value = '07';
+    change(select);
+    expect(events).toMatchObject([{ kind: 'manualInput' }]);
+    expect(JSON.stringify(events)).not.toContain('07');
+  });
+
+  it('Entrée hors formulaire devient une étape « press », mais pas si elle soumet', async () => {
+    document.body.insertAdjacentHTML('beforeend', '<label for="spa">Recherche</label><input id="spa" type="search" />');
+    const spa = $<HTMLInputElement>('#spa');
+    type(spa, 'react');
+    spa.dispatchEvent(trusted(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(events.map((e) => e.kind)).toEqual(['input', 'press']);
+
+    events.length = 0;
+    const q = $<HTMLInputElement>('#q');
+    q.dispatchEvent(trusted(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    $('#search').dispatchEvent(trusted(new SubmitEvent('submit', { bubbles: true, submitter: null })));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(events.map((e) => e.kind)).toEqual(['submit']);
+  });
+
+  it('capture un clic sur un élément sans rôle mais affiché comme cliquable', () => {
+    document.body.insertAdjacentHTML('beforeend', '<div id="carte" style="cursor: pointer"><span>Ouvrir la carte</span></div>');
+    click($('#carte span'));
+    expect(events).toMatchObject([{ kind: 'click', target: { tag: 'div' } }]);
+  });
+
+  it('signale le départ de la page', () => {
+    window.dispatchEvent(trusted(new Event('beforeunload')));
+    expect(events).toMatchObject([{ kind: 'leave' }]);
+  });
+
+  it('n’écoute plus rien après l’arrêt', () => {
+    capture.stop();
+    click($('#search button'));
+    expect(events).toEqual([]);
+  });
+});
+
+describe('classement', () => {
+  it.each([
+    ['<input type="password">', true],
+    ['<input autocomplete="one-time-code">', true],
+    ['<input name="iban">', true],
+    ['<input placeholder="Code de vérification">', true],
+    ['<input aria-label="CVV">', true],
+    ['<input name="q" placeholder="Rechercher">', false],
+    ['<input name="email" type="email">', false],
+  ])('%s sensible : %s', (html, expected) => {
+    document.body.innerHTML = html;
+    expect(isSensitiveField(document.body.firstElementChild as Element)).toBe(expected);
+  });
+
+  it.each([
+    ['<button>Envoyer la candidature</button>', true],
+    ['<button>Supprimer l’alerte</button>', true],
+    ['<button>Payer 30 €</button>', true],
+    ['<button>Je confirme</button>', true],
+    ['<button>Payez maintenant</button>', true],
+    ['<button>Commandez</button>', true],
+    ['<button>Submit application</button>', true],
+    ['<button>Soumettre ma candidature</button>', true],
+    ['<button>Déposer ma candidature</button>', true],
+    ['<button>Valider</button>', true],
+    ['<button>Placer la commande</button>', true],
+    ['<button>Rechercher</button>', false],
+    ['<button>Se connecter</button>', false],
+    ['<button>Sauvegarder</button>', false],
+    ['<a href="/x">Voir l’offre</a>', false],
+    ['<a href="/spa.html">Espace candidat</a>', false],
+  ])('%s irréversible : %s', (html, expected) => {
+    document.body.innerHTML = html;
+    expect(isIrreversibleAction(document.body.firstElementChild as Element)).toBe(expected);
+  });
+});

@@ -71,3 +71,56 @@ export function patternFromUserInput(input: string): string | null {
   const pattern = originPatternFor(candidate);
   return pattern !== null && isGrantablePattern(pattern) ? pattern : null;
 }
+
+// --- URL enregistrées : confidentialité et comparaison ---------------------
+
+/** Paramètres porteurs de secrets : jamais stockés. */
+const SECRET_PARAM = /^(token|access_token|id_token|refresh_token|session|sessionid|sid|api_?key|auth|password|passwd|pwd|secret|signature|sig|otp|nonce|ticket)$/i;
+/** `code` et `state` ensemble : retour d'autorisation OAuth. Séparément, ce sont souvent des paramètres métier. */
+const OAUTH_PAIR = ['code', 'state'] as const;
+/** Paramètres qui changent d'une visite à l'autre : ignorés à la comparaison. */
+const VOLATILE_PARAM = /^(utm_\w+|gclid|fbclid|msclkid|_|cb|ts|timestamp|t|rnd|random|cache|v)$/i;
+
+/**
+ * Retire d'une URL ce qui ne doit jamais être stocké : paramètres de type jeton,
+ * code, session, signature, et fragment porteur de paramètres (`#access_token=…`).
+ */
+export function sanitizeUrl(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  for (const name of [...parsed.searchParams.keys()]) {
+    if (SECRET_PARAM.test(name)) parsed.searchParams.delete(name);
+  }
+  if (OAUTH_PAIR.every((name) => parsed.searchParams.has(name))) {
+    for (const name of OAUTH_PAIR) parsed.searchParams.delete(name);
+  }
+  if (parsed.hash.includes('=')) parsed.hash = '';
+  return parsed.href;
+}
+
+/**
+ * L'URL atteinte au replay correspond-elle à l'URL enregistrée ? Même origine et
+ * même chemin ; chaque paramètre enregistré non volatil doit avoir la même valeur ;
+ * le fragment ne compte que pour le routage par ancre (`#/vue`).
+ */
+export function urlMatches(actual: string | undefined, expected: string): boolean {
+  if (actual === undefined) return false;
+  let a: URL;
+  let e: URL;
+  try {
+    a = new URL(actual);
+    e = new URL(expected);
+  } catch {
+    return actual === expected;
+  }
+  if (a.origin !== e.origin || a.pathname !== e.pathname) return false;
+  for (const [name, value] of e.searchParams) {
+    if (VOLATILE_PARAM.test(name) || SECRET_PARAM.test(name)) continue;
+    if (a.searchParams.get(name) !== value) return false;
+  }
+  return e.hash.startsWith('#/') ? a.hash === e.hash : true;
+}

@@ -5,7 +5,7 @@ import { LOCAL_KEYS } from './keys';
 import { WorkflowStore } from './workflow-store';
 
 const make = (id: string): Workflow => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   id,
   name: id,
   origin: 'http://localhost:5173',

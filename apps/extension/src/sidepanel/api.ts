@@ -1,6 +1,16 @@
-import { IDLE, errorMessage, fail, type Command, type CommandResponse, type RunSummary, type SessionState } from '@flowpilot/shared';
+import {
+  IDLE,
+  errorMessage,
+  fail,
+  type Command,
+  type CommandResponse,
+  type RecordingDraft,
+  type RunSummary,
+  type SessionState,
+} from '@flowpilot/shared';
 import { chromeArea } from '../storage/area';
 import { LOCAL_KEYS, SESSION_KEYS } from '../storage/keys';
+import { RunStore } from '../storage/run-store';
 import { SessionStore } from '../storage/session-store';
 import { WorkflowStore, type WorkflowList } from '../storage/workflow-store';
 
@@ -8,7 +18,10 @@ import { WorkflowStore, type WorkflowList } from '../storage/workflow-store';
 export interface PanelSnapshot {
   session: SessionState;
   workflows: WorkflowList;
-  lastRun: RunSummary | null;
+  /** Historique des exécutions, du plus récent au plus ancien. */
+  runs: RunSummary[];
+  /** Brouillon de l'enregistrement en cours (aperçu des étapes en direct). */
+  draft: RecordingDraft | null;
   /** Motifs d'origine accordés à l'extension (ex. `http://localhost/*`). */
   allowedOrigins: string[];
 }
@@ -28,13 +41,13 @@ export interface ExtensionApi {
   removeOrigin(pattern: string): Promise<boolean>;
 }
 
-/** Clés affichées par le panneau (le brouillon d'enregistrement ne l'est pas). */
-const WATCHED_KEYS = new Set<string>([SESSION_KEYS.session, SESSION_KEYS.lastRun, LOCAL_KEYS.workflows]);
+const WATCHED_KEYS = new Set<string>([...Object.values(SESSION_KEYS), ...Object.values(LOCAL_KEYS)]);
 
 export const EMPTY_SNAPSHOT: PanelSnapshot = {
   session: IDLE,
   workflows: { workflows: [], invalidCount: 0 },
-  lastRun: null,
+  runs: [],
+  draft: null,
   allowedOrigins: [],
 };
 
@@ -43,13 +56,21 @@ export const chromeApi: ExtensionApi = {
     // Mêmes stores (et donc même validation) que le service worker, en lecture seule.
     const sessions = new SessionStore(chromeArea(chrome.storage.session));
     const workflows = new WorkflowStore(chromeArea(chrome.storage.local));
-    const [session, workflowList, lastRun, permissions] = await Promise.all([
+    const runs = new RunStore(chromeArea(chrome.storage.local));
+    const [session, workflowList, runList, draft, permissions] = await Promise.all([
       sessions.getSession(),
       workflows.list(),
-      sessions.getLastRun(),
+      runs.list(),
+      sessions.getDraft(),
       chrome.permissions.getAll(),
     ]);
-    return { session, workflows: workflowList, lastRun, allowedOrigins: [...(permissions.origins ?? [])].sort() };
+    return {
+      session,
+      workflows: workflowList,
+      runs: runList,
+      draft,
+      allowedOrigins: [...(permissions.origins ?? [])].sort(),
+    };
   },
 
   subscribe(onChange) {

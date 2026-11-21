@@ -23,3 +23,16 @@ Décisions clés (détail : docs/architecture.md) :
 Revue : requesting-code-review (0 critique, 6 importants corrigés : arrêt avant étape, `complete` d'un chargement antérieur + vérif origine du pong, script orphelin, watch qui effaçait content.js, permission rejetée silencieuse, live region bavarde) puis simplify (gardes partagées, failedRun, stores réutilisés par le panneau, build/e2e simplifiés).
 Key files/commits: b27fec5 (scaffold crew), d325456 (Sprint 1). Limites connues : docs/architecture.md § Limites.
 Tests: checklists crew/TESTS/IA/sprint-1-extension-scaffold.md (filtre d'origine des messages, rechargement d'extension, arrêt pendant navigation) et crew/TESTS/DEV/sprint-1-extension-scaffold.md (Side Panel natif, dialogue de permission, persistance après redémarrage). Couvert par ailleurs : 115 tests Vitest + 6 e2e Playwright.
+
+## sprint-2-record-replay — 2026-11-21
+What: Sprint 2 FlowPilot, recorder et moteur de workflow déterministes, sans IA. Branche `feat/sprint-2-recorder`.
+- Schéma v2 (navigate, waitForNavigation, click, input, manualInput, select, check, press, submit), cibles multi-indices (`ElementTarget` : rôle, nom, attributs stables, texte, contexte de ligne, CSS), migration v1.
+- Capture dans la page (`isTrusted` uniquement), champs sensibles réduits à `manualInput` avant tout envoi, actions irréversibles marquées `confirm`.
+- Compilation pure des événements (`compileSteps`) : ordre chronologique, fusion des saisies, classement des navigations (fenêtre 3 s + `beforeunload`), redirections. SPA via `tabs.onUpdated`. Content script enregistré dynamiquement pendant l'enregistrement (`registerContentScripts`, `document_end`) + `content/hello`.
+- Grounding déterministe : indices forts puis contexte de ligne ; CSS et texte jamais pour départager ; ambiguïté = `TARGET_AMBIGUOUS`.
+- Replay : attentes d'URL tolérantes (`urlMatches`), vérification des effets, timeouts, arrêt propagé jusque dans la page (`content/cancel`), journal par étape (`RunSummary.log`, `RunStore`), intervention humaine (`awaitingHuman`, `replay/continue`), confirmation rejugée dans la page (`CONFIRMATION_REQUIRED`), keepalive du panneau.
+- Side Panel : étapes et statuts par étape, aperçu en direct, invite de confirmation. Site de démo : `spa.html`, boutons homonymes.
+Décisions : TS conservé à 6.0 ; URL assainies (`sanitizeUrl`) avant stockage ; contexte de ligne enregistré seulement s'il y a des homonymes ; pas de fusion des doubles-clics (fidélité aux gestes).
+Revue : revue indépendante (1 critique, 7 importants, 4 mineurs, tous corrigés) puis contre-vérification (1 trou I2 + 1 régression href + 3 mineurs, corrigés). Passe `simplify` non relancée : la consigne du sprint excluait les refactorings sans bénéfice concret.
+Key files/commits: 1654eaa (feat), 1d031ad (fix review), d080251 (docs). Préparation Sprint 3 : docs/architecture.md § Préparation du Sprint 3.
+Tests: 248 Vitest + 15 e2e Playwright sur le build distribué, tous passés. Checklists : crew/TESTS/IA/sprint-2-record-replay.md (durée de vie réelle du service worker) et crew/TESTS/DEV/sprint-2-record-replay.md (Side Panel natif, site réel).

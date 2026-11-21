@@ -1,29 +1,30 @@
-import { WORKFLOW_SCHEMA_VERSION, hostLabel, type Workflow } from '@flowpilot/shared';
+import {
+  MAX_DRAFT_EVENTS,
+  hostLabel,
+  type DraftEvent,
+  type RecordingDraft,
+} from '@flowpilot/shared';
 
 /**
- * Recorder — Sprint 1 : un enregistrement capture uniquement la page de départ
- * (étape `navigate`). La capture des clics et saisies (Sprint 2) se branchera
- * ici : le content script enverra des événements que `appendStep` ajoutera
- * au brouillon, après filtrage des champs sensibles.
+ * Recorder côté service worker : gestion du brouillon d'enregistrement.
+ * La capture a lieu dans la page (`capture.ts`), la compilation en étapes
+ * dans le paquet partagé (`compileSteps`).
  */
 
-export interface DraftInput {
-  id: string;
-  stepId: string;
-  origin: string;
-  startUrl: string;
-  now: Date;
+export function createDraft(input: { workflowId: string; origin: string; startUrl: string; startedAt: number }): RecordingDraft {
+  return { ...input, events: [] };
 }
 
-export function createDraftWorkflow({ id, stepId, origin, startUrl, now }: DraftInput): Workflow {
-  return {
-    schemaVersion: WORKFLOW_SCHEMA_VERSION,
-    id,
-    name: defaultWorkflowName(origin),
-    origin,
-    createdAt: now.toISOString(),
-    steps: [{ id: stepId, kind: 'navigate', url: startUrl }],
-  };
+/**
+ * Ajoute des événements au brouillon. Les horodatages venus de la page sont
+ * bornés à la durée de l'enregistrement ; au-delà de `MAX_DRAFT_EVENTS`, les
+ * événements sont ignorés (protection du stockage).
+ */
+export function appendEvents(draft: RecordingDraft, events: readonly DraftEvent[], now: number): RecordingDraft {
+  const room = MAX_DRAFT_EVENTS - draft.events.length;
+  if (room <= 0 || events.length === 0) return draft;
+  const clamped = events.slice(0, room).map((event) => ({ ...event, at: Math.min(Math.max(event.at, draft.startedAt), now) }));
+  return { ...draft, events: [...draft.events, ...clamped] };
 }
 
 /** Nom par défaut ; la date de création est affichée à part dans la liste. */

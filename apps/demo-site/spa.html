@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Espace candidat | Offres du Coin</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">Offres du Coin</a>
+      <p class="demo-note">Site de démonstration FlowPilot, données fictives.</p>
+    </header>
+
+    <main class="page">
+      <h1>Espace candidat</h1>
+      <!-- Application monopage : navigation par history.pushState, sans rechargement. -->
+      <nav class="tabs" aria-label="Espace candidat">
+        <a href="/spa.html?vue=alertes" data-view="alertes">Mes alertes</a>
+        <a href="/spa.html?vue=connexion" data-view="connexion">Connexion</a>
+      </nav>
+      <div id="view" aria-live="polite"></div>
+    </main>
+    <script type="module" src="/src/spa.ts"></script>
+  </body>
+</html>

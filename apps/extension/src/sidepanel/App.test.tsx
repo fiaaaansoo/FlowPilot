@@ -6,7 +6,7 @@ import { App } from './App';
 import { EMPTY_SNAPSHOT, type ExtensionApi, type PanelSnapshot } from './api';
 
 const workflow: Workflow = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: 'wf-1',
   name: 'Procédure sur localhost:5173',
   origin: 'http://localhost:5173',
@@ -139,20 +139,68 @@ describe('Side Panel', () => {
     expect(button('Réessayer')).toBeInTheDocument();
   });
 
-  it('affiche l’étape en échec du dernier run', async () => {
+  it('affiche les étapes du workflow sélectionné et l’étape en échec du dernier run', async () => {
     const fake = fakeApi({
       workflows: { workflows: [workflow], invalidCount: 0 },
-      lastRun: {
-        workflowId: 'wf-1',
-        outcome: 'failed',
-        startedAt: 1,
-        finishedAt: 2,
-        stepsCompleted: 0,
-        totalSteps: 1,
-        failure: { stepIndex: 0, code: 'NAVIGATION_FAILED', message: 'La page n’a pas fini de charger en 15 s.' },
-      },
+      runs: [
+        {
+          workflowId: 'wf-1',
+          outcome: 'failed',
+          startedAt: 1,
+          finishedAt: 2,
+          stepsCompleted: 0,
+          totalSteps: 1,
+          failure: { stepIndex: 0, code: 'NAVIGATION_FAILED', message: 'La page n’a pas fini de charger en 15 s.' },
+          log: [{ stepIndex: 0, kind: 'navigate', status: 'failed', startedAt: 1, finishedAt: 2, code: 'NAVIGATION_FAILED', message: 'La page n’a pas fini de charger en 15 s.' }],
+        },
+      ],
     });
     render(<App api={fake.api} />);
     expect(await screen.findByText(/Échec à l’étape 1 : La page n’a pas fini de charger/)).toBeInTheDocument();
+    const steps = screen.getByRole('list', { name: 'Étapes de Procédure sur localhost:5173' });
+    expect(steps).toHaveTextContent('Ouvrir /');
+    expect(steps).toHaveTextContent('en échec');
+  });
+
+  it('montre les étapes capturées en direct pendant un enregistrement', async () => {
+    const fake = fakeApi({
+      session: { status: 'recording', tabId: 1, origin: 'http://localhost:5173', workflowId: 'w', startedAt: Date.now() },
+      draft: {
+        workflowId: 'w',
+        origin: 'http://localhost:5173',
+        startUrl: 'http://localhost:5173/',
+        startedAt: 0,
+        events: [{ kind: 'click', at: 1, target: { tag: 'button', name: 'Rechercher', attributes: {}, css: 'button' } }],
+      },
+    });
+    render(<App api={fake.api} />);
+    const live = await screen.findByRole('list', { name: 'Étapes capturées' });
+    expect(live).toHaveTextContent('Cliquer sur « Rechercher »');
+    expect(screen.getByLabelText('État de FlowPilot')).toHaveTextContent('2 étapes');
+  });
+
+  it('demande confirmation avant une action irréversible et transmet la décision', async () => {
+    const confirmFlow = {
+      ...workflow,
+      steps: [
+        workflow.steps[0] as Workflow['steps'][number],
+        { id: 's2', kind: 'click' as const, confirm: true as const, target: { tag: 'button', name: 'Envoyer la candidature', attributes: {}, css: 'button' } },
+      ],
+    };
+    const fake = fakeApi({
+      session: { status: 'replaying', tabId: 1, workflowId: 'wf-1', startedAt: 1, stepIndex: 1, awaitingHuman: true },
+      workflows: { workflows: [confirmFlow], invalidCount: 0 },
+    });
+    render(<App api={fake.api} />);
+    const dialog = await screen.findByRole('alertdialog', { name: 'Confirmation requise' });
+    expect(dialog).toHaveTextContent('Cliquer sur « Envoyer la candidature »');
+    await userEvent.click(button('Confirmer et exécuter'));
+    expect(fake.send).toHaveBeenCalledWith({ type: 'replay/continue', stepIndex: 1 });
+  });
+
+  it('garde le service worker éveillé pendant un replay', async () => {
+    const fake = fakeApi({ session: { status: 'replaying', tabId: 1, workflowId: 'wf-1', startedAt: 1, stepIndex: 0 } });
+    render(<App api={fake.api} keepAliveMs={20} />);
+    await waitFor(() => expect(fake.send).toHaveBeenCalledWith({ type: 'session/get' }));
   });
 });

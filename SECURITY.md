@@ -8,7 +8,7 @@
 
 ## Auth boundaries
 
-- Pas d'authentification utilisateur au Sprint 1.
+- Pas d'authentification utilisateur aux Sprints 1-2.
 - Frontières internes de l'extension :
   - Seules les pages de l'extension (`sender.url` sous `chrome-extension://<id>/`) peuvent envoyer des commandes au service worker. Les messages des content scripts, donc des pages web, et des autres extensions sont ignorés.
   - Le content script n'accepte que les messages de sa propre extension et n'exécute jamais de code reçu.
@@ -17,8 +17,10 @@
 
 ## Sensitive data / PII
 
-- Jamais capturés : `input[type=password]`, champs `autocomplete` de paiement (`cc-*`) ou d'identifiants (`current-password`, `new-password`, `one-time-code`), cookies, jetons, en-têtes d'authentification. Le filtrage se fera dans le content script, avant tout envoi (Sprint 2).
-- Les workflows restent en local (`chrome.storage.local`). Rien n'est envoyé à un serveur au Sprint 1.
+- Jamais capturés : `input[type=password]`, champs `autocomplete` de paiement (`cc-*`) ou d'identifiants (`current-password`, `new-password`, `one-time-code`), champs dont le nom, l'id, le label ou le placeholder évoque un mot de passe, une carte, un IBAN, un code de vérification ou un jeton, et tout sous-arbre marqué `data-flowpilot-sensitive` / `data-private` / `data-sensitive`. Le filtrage a lieu dans le content script (`recorder/classify.ts`), **avant tout envoi** : la valeur n'est même pas lue, l'étape devient `manualInput`. Cookies, jetons et en-têtes ne sont jamais accessibles (aucune permission correspondante).
+- Les valeurs des autres champs (texte de recherche, nom, e-mail…) sont enregistrées : c'est le but du replay. Les éléments eux-mêmes sont décrits par leur rôle, leur nom accessible et des attributs stables, jamais par leur valeur (sauf cases, radios et boutons, dont la valeur est un libellé).
+- Les workflows et l'historique des runs restent en local (`chrome.storage.local`). Rien n'est envoyé à un serveur aux Sprints 1-2.
+- Seuls les gestes réels (`isTrusted`) sont capturés ; les événements de capture ne sont acceptés que depuis la frame principale de l'onglet enregistré, puis revalidés.
 - Contenu des pages = donnée non fiable : jamais interprété comme une instruction (défense contre l'injection de prompt dès le Sprint 3).
 
 ## Pre-production checklist

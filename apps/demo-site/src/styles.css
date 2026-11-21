@@ -179,3 +179,33 @@ textarea {
 .done {
   font-weight: 600;
 }
+
+.header-link {
+  color: var(--accent);
+}
+
+.tabs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.tabs a {
+  color: var(--accent);
+}
+
+.tabs a[aria-current='page'] {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+button.link {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

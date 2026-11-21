@@ -7,6 +7,7 @@ import { fail, ok, type Result } from './result.js';
  *
  *   idle ──RECORD_STARTED──▶ recording ──STOPPED──▶ idle
  *   idle ──REPLAY_STARTED──▶ replaying ──STOPPED | REPLAY_FINISHED──▶ idle
+ *   replaying ──HUMAN_REQUESTED──▶ replaying (awaitingHuman) ──HUMAN_RESOLVED──▶ replaying
  */
 
 export interface IdleSession {
@@ -29,6 +30,8 @@ export interface ReplayingSession {
   startedAt: number;
   /** Index (0-based) de l'étape en cours d'exécution. */
   stepIndex: number;
+  /** Présent quand le replay attend une intervention humaine sur l'étape `stepIndex`. */
+  awaitingHuman?: true;
 }
 
 export type SessionState = IdleSession | RecordingSession | ReplayingSession;
@@ -38,6 +41,8 @@ export type SessionEvent =
   | { type: 'RECORD_STARTED'; tabId: number; origin: string; workflowId: string; startedAt: number }
   | { type: 'REPLAY_STARTED'; tabId: number; workflowId: string; startedAt: number }
   | { type: 'STEP_STARTED'; stepIndex: number }
+  | { type: 'HUMAN_REQUESTED'; stepIndex: number }
+  | { type: 'HUMAN_RESOLVED' }
   | { type: 'STOPPED' }
   | { type: 'REPLAY_FINISHED' };
 
@@ -65,7 +70,13 @@ export function transition(state: SessionState, event: SessionEvent): Result<Ses
       });
     case 'STEP_STARTED':
       if (state.status !== 'replaying') return invalid(state, event);
-      return ok({ ...state, stepIndex: event.stepIndex });
+      return ok(replaying(state, event.stepIndex, false));
+    case 'HUMAN_REQUESTED':
+      if (state.status !== 'replaying' || state.awaitingHuman) return invalid(state, event);
+      return ok(replaying(state, event.stepIndex, true));
+    case 'HUMAN_RESOLVED':
+      if (state.status !== 'replaying' || !state.awaitingHuman) return invalid(state, event);
+      return ok(replaying(state, state.stepIndex, false));
     case 'STOPPED':
       if (state.status === 'idle') return invalid(state, event);
       return ok(IDLE);
@@ -73,6 +84,11 @@ export function transition(state: SessionState, event: SessionEvent): Result<Ses
       if (state.status !== 'replaying') return invalid(state, event);
       return ok(IDLE);
   }
+}
+
+function replaying(state: ReplayingSession, stepIndex: number, awaitingHuman: boolean): ReplayingSession {
+  const { status, tabId, workflowId, startedAt } = state;
+  return { status, tabId, workflowId, startedAt, stepIndex, ...(awaitingHuman ? { awaitingHuman: true as const } : {}) };
 }
 
 function invalid(state: SessionState, event: SessionEvent): Result<never> {
@@ -102,7 +118,14 @@ export function parseSession(raw: unknown): SessionState {
     return { status: 'recording', tabId: s.tabId, origin: s.origin, workflowId: s.workflowId, startedAt: s.startedAt };
   }
   if (s.status === 'replaying' && isNum(s.tabId) && isStr(s.workflowId) && isNum(s.startedAt) && isNum(s.stepIndex)) {
-    return { status: 'replaying', tabId: s.tabId, workflowId: s.workflowId, startedAt: s.startedAt, stepIndex: s.stepIndex };
+    return {
+      status: 'replaying',
+      tabId: s.tabId,
+      workflowId: s.workflowId,
+      startedAt: s.startedAt,
+      stepIndex: s.stepIndex,
+      ...(s.awaitingHuman === true ? { awaitingHuman: true as const } : {}),
+    };
   }
   return IDLE;
 }
