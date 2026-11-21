@@ -60,7 +60,7 @@ npm run dev:demo                # demo site, http://localhost:5173
 npm run dev:extension           # continuous rebuild of apps/extension/dist
 npm run lint                    # ESLint
 npm run typecheck               # tsc root + workspaces
-npm test                        # Vitest, 287 tests
+npm test                        # Vitest, 288 tests
 npx playwright install chromium # once, browser for the e2e tests
 npm run test:e2e                # extension build + Playwright (+ backend, mock provider), 19 tests
 npm run build                   # apps/extension/dist + apps/demo-site/dist
