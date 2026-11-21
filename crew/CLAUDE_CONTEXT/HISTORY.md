@@ -36,3 +36,17 @@ Décisions : TS conservé à 6.0 ; URL assainies (`sanitizeUrl`) avant stockage 
 Revue : revue indépendante (1 critique, 7 importants, 4 mineurs, tous corrigés) puis contre-vérification (1 trou I2 + 1 régression href + 3 mineurs, corrigés). Passe `simplify` non relancée : la consigne du sprint excluait les refactorings sans bénéfice concret.
 Key files/commits: 1654eaa (feat), 1d031ad (fix review), d080251 (docs). Préparation Sprint 3 : docs/architecture.md § Préparation du Sprint 3.
 Tests: 248 Vitest + 15 e2e Playwright sur le build distribué, tous passés. Checklists : crew/TESTS/IA/sprint-2-record-replay.md (durée de vie réelle du service worker) et crew/TESTS/DEV/sprint-2-record-replay.md (Side Panel natif, site réel).
+
+## sprint-3-agent-recovery — 2026-11-21
+What: Sprint 3 FlowPilot, agentic intelligence and autonomous recovery, on branch `feat/sprint-3-agentic-recovery` (based on the unmerged Sprint 2 branch).
+- Optional local FastAPI backend `apps/api` (loopback, bearer token, closed CORS, no docs): contract `flowpilot.recovery/v1` (Pydantic + TypeScript, shared fixtures), bounded state machine (classify, memory, context, semantic grounding, model loop with read-only tools, validation), budgets checked before each call, telemetry (calls, tokens incl. cache, latency, cost).
+- Providers without fallback: none (default), Ollama (first class), OpenAI-compatible, Anthropic API (official SDK, Console key only), mock. Claude.ai subscription not used (ADR 0004).
+- Verified SQLite memory: written only after the next step succeeds, revalidated before reuse, forgotten after a failed reuse, inspectable and deletable.
+- Extension: bounded sanitized page observation (no values, no sensitive fields), execution by snapshot ref revalidated in the page, service-worker gateway (binding, observed ref, kind, same origin, workflow origin, confirmation rules), per-run budgets, side panel AI settings, proposal confirmation, memory view, per-step recovery details.
+- Decision policy: a model proposal acts alone only for a click, with confidence ≥ 0.8, structural support, no identical copy, and the deterministic ranking independently agreeing; everything else asks the user.
+- Demo-site variants (`?variante=`), e2e on the shipped build with the real backend (mock provider), benchmark (`npm run bench`) incl. local qwen2.5:3b.
+Review: independent review (2 high, 6 medium, 6 low): highs and mediums fixed with regression tests, lows fixed or documented (docs/recovery.md § Known limits); then `simplify` (4 angles) applied.
+Key files/commits: d9502d8 (api), 792048c (extension), 04ae7ea (e2e), 17c35ff (docs, CI), 52f53f0 (benchmark), 9e53fc3 (review fixes), b74e20e (simplify). Docs: docs/recovery.md, docs/adr/0001-0004, docs/benchmarks/.
+Benchmark (before review fixes): deterministic 5/9, semantic 6/9, qwen2.5:3b 9/9 at 0 USD, 0 incorrect actions in every mode, memory reuse 4/4. Post-fix re-run stopped by the system for lack of memory (see TESTS/IA).
+Zone note: root configs (playwright*.config.ts, tsconfig.json, eslint.config.js, .gitignore) were also changed; added to the batch zone.
+Tests: 288 Vitest + 19 e2e Playwright + 56 pytest, all passed; ruff clean. Checklists: crew/TESTS/IA/sprint-3-agent-recovery.md (post-fix benchmark, local-model injection) and crew/TESTS/DEV/sprint-3-agent-recovery.md (real Chrome permission prompt, real Ollama in the panel, optional billed Anthropic run).

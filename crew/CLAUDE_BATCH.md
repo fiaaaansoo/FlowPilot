@@ -9,7 +9,7 @@ _No unsorted task._
 
 ## Batch B — Agentic backend and evaluation (sequential: Sprint 4 depends on Sprint 3)
 
-Zone: package.json, apps/api/, apps/extension/, apps/demo-site/, packages/shared/, tests/, docs/, .github/, README.md, AGENTS.md, SECURITY.md, CONTRIBUTING.md
+Zone: package.json, playwright*.config.ts, tsconfig.json, eslint.config.js, .gitignore, apps/api/, apps/extension/, apps/demo-site/, packages/shared/, tests/, docs/, .github/, README.md, AGENTS.md, SECURITY.md, CONTRIBUTING.md
 
-- `sprint-3-agent-recovery.md`
+- ~~`sprint-3-agent-recovery.md`~~
 - `sprint-4-evaluation.md`
