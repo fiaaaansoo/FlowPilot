@@ -24,7 +24,8 @@
     "test:e2e": "npm run build -w @flowpilot/extension && playwright test",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",
     "eval": "npm run build -w @flowpilot/extension && playwright test -c playwright.benchmark.config.ts",
-    "eval:report": "tsx tests/benchmark/report.ts"
+    "eval:report": "tsx tests/benchmark/report.ts",
+    "eval:figures": "tsx tests/benchmark/figures.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -8,6 +8,9 @@ import {
   proposalMatches,
   proposedPart,
   simulatedUserAccepts,
+  stackedBars,
+  lineChart,
+  barChart,
   quantile,
   stdev,
   summarize,
@@ -210,5 +213,17 @@ describe('scenario schema', () => {
     const result = validateScenario(scenario, new Set(['other']));
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toContain(message);
+  });
+});
+
+describe('charts', () => {
+  it('draw only the given values and escape labels', () => {
+    const bars = stackedBars('Verdicts', [{ label: 'a<b', segments: [{ name: 'ok', value: 3 }, { name: 'ko', value: 1 }] }], ['ok', 'ko']);
+    expect(bars).toContain('a&#60;b');
+    expect(bars.match(/<rect [^>]*height="18"/g)).toHaveLength(2);
+    const line = lineChart('Rot', 'distractors', 'correct', [{ name: 's', points: [{ x: 0, y: 1 }, { x: 50, y: 0.5 }] }]);
+    expect(line).toContain('<polyline');
+    expect(line).toContain('s, 50: 50 %');
+    expect(barChart('Time', 'ms', [{ label: 'x', value: 1234 }])).toContain('1,234 ms');
   });
 });
