@@ -48,6 +48,9 @@ export type PageCheck =
 export interface PriorRun {
   /** Mutations applied for this earlier replay (memory scenarios). */
   mutations: string[];
+  /** Ground-truth element on that earlier page (it may differ from the measured page's). */
+  target: string | null;
+  targetContext?: string;
   /** Whether the simulated user accepts a proposal naming the expected target in that run. */
   acceptProposal: boolean;
   /** Record a separate workflow for this run (correction learned in another workflow). */
@@ -87,6 +90,11 @@ export interface Scenario {
   forbidden: PageCheck[];
   /** Earlier replays executed before the measured one, with memory kept (memory scenarios). */
   priorRuns?: PriorRun[];
+  /**
+   * Added after product settings were tuned on the rest of the dataset (Sprint 4 review):
+   * results on these scenarios are reported separately as held-out evidence.
+   */
+  heldOut?: boolean;
 }
 
 export interface ValidationResult {
@@ -162,7 +170,7 @@ function checkPageCheck(c: unknown, at: string, errors: string[]): void {
 export function validateScenario(raw: unknown, knownMutations?: ReadonlySet<string>): ValidationResult {
   const errors: string[] = [];
   if (!isRecord(raw)) return { ok: false, errors: ['scenario: expected an object'] };
-  const allowed = new Set(['schemaVersion', 'id', 'category', 'title', 'rationale', 'workflow', 'mutations', 'permissions', 'expected', 'forbidden', 'priorRuns']);
+  const allowed = new Set(['schemaVersion', 'id', 'category', 'title', 'rationale', 'workflow', 'mutations', 'permissions', 'expected', 'forbidden', 'priorRuns', 'heldOut']);
   for (const key of Object.keys(raw)) if (!allowed.has(key)) errors.push(`unknown key "${key}"`);
   const id = typeof raw.id === 'string' ? raw.id : '?';
   const at = (path: string) => `${id}.${path}`;
@@ -228,10 +236,14 @@ export function validateScenario(raw: unknown, knownMutations?: ReadonlySet<stri
     else
       raw.priorRuns.forEach((run, i) => {
         if (!isRecord(run) || typeof run.acceptProposal !== 'boolean') errors.push(at(`priorRuns[${String(i)}]: needs acceptProposal`));
-        else checkMutations(run.mutations, `priorRuns[${String(i)}].mutations`);
+        else {
+          checkMutations(run.mutations, `priorRuns[${String(i)}].mutations`);
+          if (run.target !== null && !isText(run.target)) errors.push(at(`priorRuns[${String(i)}].target: string or null`));
+        }
       });
   }
   if (raw.category === 'memory' && raw.priorRuns === undefined) errors.push(at('priorRuns: memory scenarios need at least one prior run'));
+  if (raw.heldOut !== undefined && typeof raw.heldOut !== 'boolean') errors.push(at('heldOut: boolean'));
 
   return { ok: errors.length === 0, errors };
 }

@@ -55,7 +55,8 @@
         "mutations": [
           "search-label=synonym"
         ],
-        "acceptProposal": true
+        "acceptProposal": true,
+        "target": "Trouver des offres"
       }
     ]
   },
@@ -119,7 +120,8 @@
         "mutations": [
           "search-label=synonym"
         ],
-        "acceptProposal": true
+        "acceptProposal": true,
+        "target": "Trouver des offres"
       }
     ]
   },
@@ -179,7 +181,8 @@
         "mutations": [
           "search-label=synonym"
         ],
-        "acceptProposal": true
+        "acceptProposal": true,
+        "target": "Trouver des offres"
       }
     ]
   },
@@ -244,7 +247,8 @@
         "mutations": [
           "search-label=synonym"
         ],
-        "acceptProposal": true
+        "acceptProposal": true,
+        "target": "Trouver des offres"
       }
     ]
   },
@@ -305,6 +309,7 @@
           "search-label=synonym"
         ],
         "acceptProposal": true,
+        "target": "Trouver des offres",
         "separateWorkflow": true
       }
     ]
@@ -365,7 +370,8 @@
         "mutations": [
           "search-label=synonym"
         ],
-        "acceptProposal": false
+        "acceptProposal": false,
+        "target": "Trouver des offres"
       }
     ]
   }

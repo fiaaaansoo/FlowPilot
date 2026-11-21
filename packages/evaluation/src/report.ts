@@ -134,7 +134,8 @@ function memoryTable(attempts: readonly AttemptRecord[]): string | null {
 }
 
 export function renderMarkdown(manifests: readonly Manifest[], attempts: readonly AttemptRecord[], options: ReportOptions): string {
-  const summaries = summarize(attempts);
+  // Headline tables: cold attempts only (warm replays appear in the memory table).
+  const summaries = summarize(attempts.filter((a) => a.phase === 'cold'));
   const configs = summaries.map((s) => s.configId);
   const runs = [...new Set(manifests.map((m) => m.runId))];
   const commits = [...new Set(manifests.map((m) => `${m.gitCommit.slice(0, 7)}${m.gitDirty ? ' (dirty)' : ''}`))];
@@ -165,7 +166,7 @@ export function renderMarkdown(manifests: readonly Manifest[], attempts: readonl
       ),
     ),
     '',
-    '## Outcomes (all attempts)',
+    '## Outcomes (cold attempts)',
     '',
     outcomeTable(summaries),
     '',
@@ -195,6 +196,21 @@ export function renderMarkdown(manifests: readonly Manifest[], attempts: readonl
           const c = comparePaired(attempts, a, b);
           return [`\`${a}\``, `\`${b}\``, String(c.pairs), String(c.bothMet), String(c.onlyA), String(c.onlyB), String(c.neither), c.pValue.toFixed(4)];
         }),
+      ),
+    );
+  }
+  const heldOut = attempts.filter((a) => a.heldOut && a.phase === 'cold' && a.repeat === 1);
+  if (heldOut.length) {
+    const ids = [...new Set(heldOut.map((a) => a.scenarioId))];
+    parts.push(
+      '',
+      '## Held-out scenarios',
+      '',
+      'Added after product settings were tuned on the rest of the dataset; their verdicts are evidence the tuning generalizes (or not).',
+      '',
+      table(
+        ['Scenario', ...configs.map((c) => `\`${c}\``)],
+        ids.map((id) => [id, ...configs.map((c) => heldOut.find((a) => a.scenarioId === id && a.configId === c)?.verdict ?? '–')]),
       ),
     );
   }

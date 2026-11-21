@@ -73,6 +73,7 @@ const SEARCH_LABELS: Record<string, string> = {
   english: 'Search',
   short: 'Chercher',
   expanded: 'Rechercher les offres d’emploi correspondantes',
+  long: 'Rechercher parmi toutes nos offres',
 };
 
 export const MUTATIONS: Record<string, Apply> = {
@@ -214,6 +215,7 @@ export const MUTATIONS: Record<string, Apply> = {
   // --- dynamic --------------------------------------------------------------------------
   'delay-search-button': (arg) => {
     if (arg === 'silent') delayed(2_500, false);
+    else if (arg === 'silent-long') delayed(3_500, false);
     else if (arg === 'renamed') delayed(1_000, true, 'Trouver des offres');
     else delayed(800, true);
   },

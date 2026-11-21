@@ -137,7 +137,9 @@ describe('simulated user answers', () => {
   const user = { target: 'Candidater', accept: true };
   it('confirms the recorded step itself when completing is right', () => {
     expect(simulatedUserAccepts('Confirmation requiseCliquer sur « Postuler » : cette action peut être irréversible.', user)).toBe(true);
-    expect(simulatedUserAccepts('Confirmation requiseCliquer sur « Rechercher » : cette action peut être irréversible.', { target: null, accept: true })).toBe(false);
+    // Decided from what the prompt says, not from the ground truth: data sent elsewhere is declined.
+    const crossOrigin = 'Confirmation requiseCliquer sur « Rechercher » : Ce formulaire envoie des données vers un autre site (https://evil.example) : confirmation humaine requise.';
+    expect(simulatedUserAccepts(crossOrigin, user)).toBe(false);
   });
   it('judges an AI proposal on the proposed element only, and never accepts when told to decline', () => {
     const proposal = 'Cliquer sur « Postuler » : … FlowPilot propose « Candidater » (button) (modèle de langage, confiance 90 %)';
@@ -173,6 +175,17 @@ describe('aggregation', () => {
     const c = comparePaired([...records, ...other], 'llm', 'det');
     expect(c).toMatchObject({ pairs: 4, bothMet: 1, onlyA: 2, onlyB: 0, neither: 1 });
     expect(c.pValue).toBeCloseTo(0.5, 6);
+  });
+
+  it('never mixes distractor levels, and rejects duplicate attempts', () => {
+    const levels = [0, 50].map((d) => attempt({ scenarioId: 'x', distractors: d, verdict: d ? 'unresolved' : 'confirmed_recovery' }));
+    const [s] = summarize(levels);
+    expect(s?.unstableScenarios).toEqual([]); // two levels are two cells, not two repeats
+    expect(comparePaired([...levels, ...levels.map((l) => ({ ...l, configId: 'b' }))], 'llm', 'b').pairs).toBe(2);
+    const duplicate = parseResults(`${JSON.stringify(levels[0])}
+${JSON.stringify(levels[0])}
+`);
+    expect(duplicate.errors[0]).toContain('duplicate attempt');
   });
 
   it('round-trips through JSONL and reports malformed lines', () => {

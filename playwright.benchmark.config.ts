@@ -12,7 +12,8 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: 'list',
-  use: { baseURL: 'http://localhost:5173' },
+  // Bounded actions: a click on a prompt that closed meanwhile must not stall a whole configuration.
+  use: { baseURL: 'http://localhost:5173', actionTimeout: 10_000 },
   webServer: {
     command: 'npm run dev -w @flowpilot/demo-site',
     url: 'http://localhost:5173',

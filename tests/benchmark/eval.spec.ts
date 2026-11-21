@@ -2,7 +2,7 @@ import type { ChildProcess } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { Page, Worker } from '@playwright/test';
-import { classify, proposedPart, simulatedUserAccepts, type AttemptRecord, type Gesture, type Manifest, type Observed, type PageCheck, type Scenario } from '@flowpilot/evaluation';
+import { classify, proposalMatches, proposedPart, simulatedUserAccepts, type AttemptRecord, type Gesture, type Manifest, type Observed, type PageCheck, type Scenario } from '@flowpilot/evaluation';
 import { startBackend } from '../e2e/backend';
 import { expect, test } from '../e2e/fixtures';
 import { enableAiRecovery, latestRun, startRecording, stopRecording, waitForCapture } from '../e2e/helpers';
@@ -151,24 +151,34 @@ async function replay(sidePanel: Page, serviceWorker: Worker, demo: Page, workfl
   await demo.bringToFront();
   await sidePanel.evaluate((id) => chrome.runtime.sendMessage({ type: 'replay/start', workflowId: id }), workflowId);
   const prompts: string[] = [];
+  const acceptedPrompts: string[] = [];
   let accepted = false;
   const deadline = Date.now() + REPLAY_DEADLINE_MS;
   try {
     while (Date.now() < deadline) {
       const run = (await latestRun(serviceWorker)) as RunInfo | undefined;
-      if (run && run.startedAt !== previous) return { run, prompts, accepted, visited, timedOut: false };
+      if (run && run.startedAt !== previous) return { run, prompts, accepted, acceptedPrompts, visited, timedOut: false };
       const dialog = sidePanel.getByRole('alertdialog');
       if (await dialog.isVisible()) {
-        const text = (await dialog.textContent()) ?? '';
+        const text = (await dialog.textContent().catch(() => null)) ?? '';
+        if (!text) continue; // the prompt closed meanwhile
         prompts.push(proposedPart(text).trim());
         const ok = simulatedUserAccepts(text, oracle);
         accepted ||= ok;
-        await dialog.getByRole('button', { name: ok ? 'Confirmer et exécuter' : 'Arrêter' }).click();
+        if (ok) acceptedPrompts.push(text);
+        // Short timeout: the prompt can close between the check and the click (run stopped elsewhere).
+        await dialog
+          .getByRole('button', { name: ok ? 'Confirmer et exécuter' : 'Arrêter' })
+          .click({ timeout: 2_000 })
+          .catch(() => undefined);
       }
       await sidePanel.waitForTimeout(150);
     }
-    await sidePanel.locator('.control--stop').click().catch(() => undefined);
-    return { run: undefined, prompts, accepted, visited, timedOut: true };
+    await sidePanel.locator('.control--stop').click({ timeout: 2_000 }).catch(() => undefined);
+    // Wait for the stopped run to be recorded, so it is never taken for the next replay's result.
+    const stopDeadline = Date.now() + 15_000;
+    while (Date.now() < stopDeadline && (await latestRun(serviceWorker))?.startedAt === previous) await sidePanel.waitForTimeout(250);
+    return { run: undefined, prompts, accepted, acceptedPrompts, visited, timedOut: true };
   } finally {
     demo.off('request', onRequest);
   }
@@ -191,8 +201,10 @@ for (const [index, config] of CONFIGS.entries()) {
       // Warm the model with this configuration's context size so a cold load is not counted as latency.
       await ollama('/api/generate', { model: config.model, prompt: 'ok', stream: false, keep_alive: '10m', options: { num_predict: 1, num_ctx: config.numCtx } });
     }
-    const backend: ChildProcess | null = config.backendEnv ? await startBackend(config.backendEnv, port, TOKEN) : null;
+    let backend: ChildProcess | null = null;
     try {
+      // Inside try: a failed start still unloads the warmed model.
+      backend = config.backendEnv ? await startBackend(config.backendEnv, port, TOKEN) : null;
       const demo = await context.newPage();
       const git = gitState();
       const browser = await demo.evaluate(() => navigator.userAgent);
@@ -248,19 +260,24 @@ for (const [index, config] of CONFIGS.entries()) {
       async function runScenario(scenario: Scenario, repeat: number, distractors: number | undefined) {
         if (config.backendEnv) {
           // Isolation: no correction learned in one scenario may help or hurt another.
-          await fetch(`http://127.0.0.1:${String(port)}/v1/memory`, { method: 'DELETE', headers: { Authorization: `Bearer ${TOKEN}` } });
+          const reset = await fetch(`http://127.0.0.1:${String(port)}/v1/memory`, { method: 'DELETE', headers: { Authorization: `Bearer ${TOKEN}` } });
+          if (!reset.ok) throw new Error(`memory reset failed (${String(reset.status)}): isolation between scenarios is not guaranteed`);
         }
         const workflowId = await workflowFor(scenario.workflow.id, scenario.workflow.gestures);
         const extra = distractors ? [`distractors=${String(distractors)}`] : [];
         for (const prior of scenario.priorRuns ?? []) {
           const priorWorkflow = prior.separateWorkflow && searchQa ? await workflowFor('search-qa', searchQa) : workflowId;
           await setMutations(demo, prior.mutations);
+          // The prior page has its own ground truth (it may differ from the measured page's).
           await replay(sidePanel, serviceWorker, demo, priorWorkflow, {
-            target: scenario.expected.target,
-            ...(scenario.expected.targetContext ? { context: scenario.expected.targetContext } : {}),
+            target: prior.target,
+            ...(prior.targetContext ? { context: prior.targetContext } : {}),
             accept: prior.acceptProposal,
           });
         }
+        const memoryEntries = config.backendEnv
+          ? ((await (await fetch(`http://127.0.0.1:${String(port)}/v1/memory`, { headers: { Authorization: `Bearer ${TOKEN}` } })).json()) as unknown[]).length
+          : undefined;
         const phases: AttemptRecord['phase'][] = config.memory ? ['cold', 'warm'] : ['cold'];
         for (const phase of phases) {
           await setMutations(demo, [...scenario.mutations, ...extra]);
@@ -280,6 +297,7 @@ for (const [index, config] of CONFIGS.entries()) {
           // Effects can lag behind the replay (a confirmation rendered after a delay): poll the success
           // checks for a few seconds before judging, then read the forbidden states.
           const succeeded = await settledChecks(demo, scenario.expected.success, result.visited);
+          await demo.waitForTimeout(750); // let delayed forbidden effects (a late navigation) show
           const observed: Observed = {
             runOutcome: result.timedOut || !run ? 'timeout' : run.outcome,
             successChecks: succeeded,
@@ -288,6 +306,12 @@ for (const [index, config] of CONFIGS.entries()) {
             recovered: recoveries.some((r) => r.outcome === 'recovered'),
             confirmationAsked: result.prompts.length > 0,
             confirmationAccepted: result.accepted,
+            // The step itself, or a proposal naming the ground-truth element, was confirmed.
+            confirmedTarget: result.acceptedPrompts.some(
+              (text) =>
+                !text.includes('FlowPilot propose') ||
+                (scenario.expected.target !== null && proposalMatches(proposedPart(text), scenario.expected.target, scenario.expected.targetContext)),
+            ),
           };
           const sum = (pick: (r: RecoveryInfo) => number) => recoveries.reduce((total, r) => total + pick(r), 0);
           const strategies = log.map((entry) => entry.strategy).filter((s): s is string => typeof s === 'string' && s.startsWith('ai:'));
@@ -303,6 +327,8 @@ for (const [index, config] of CONFIGS.entries()) {
             scenarioId: scenario.id,
             category: scenario.category,
             ...(distractors !== undefined ? { distractors } : {}),
+            ...(scenario.heldOut ? { heldOut: true } : {}),
+            ...(memoryEntries !== undefined ? { memoryEntries } : {}),
             repeat,
             phase,
             expected: {

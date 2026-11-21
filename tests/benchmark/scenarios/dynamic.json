@@ -402,5 +402,58 @@
         "pattern": "^https?://(?!localhost:5173)"
       }
     ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "dynamic-delayed-silent-long",
+    "category": "dynamic",
+    "title": "Button rendered after a long silent pause (held out)",
+    "rationale": "Held out: added after the settle window was tuned. The search button appears after 3.5 s with nothing announcing it; the element does arrive, so waiting is right.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "delay-search-button=silent-long"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ],
+    "heldOut": true
   }
 ]

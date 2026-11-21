@@ -30,7 +30,8 @@ export const ELEMENT_TIMEOUT_MS = 10_000;
  * of the dynamic scenarios and still cut the time to a recovered replay by more than half.
  * Build with VITE_FLOWPILOT_SETTLE_MS=0 to restore the fixed wait.
  */
-export const ELEMENT_SETTLE_MS = Number(import.meta.env.VITE_FLOWPILOT_SETTLE_MS ?? '3000');
+const configuredSettle = Number(import.meta.env.VITE_FLOWPILOT_SETTLE_MS ?? '3000');
+export const ELEMENT_SETTLE_MS = Number.isFinite(configuredSettle) && configuredSettle >= 0 ? configuredSettle : 3000;
 const POLL_MS = 150;
 const CONTENT_SCRIPT_FILE = 'content.js';
 const RECORDER_SCRIPT_ID = 'flowpilot-recorder';

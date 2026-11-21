@@ -448,5 +448,58 @@
         "pattern": "^https?://(?!localhost:5173)"
       }
     ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "semantic-long-label",
+    "category": "semantic",
+    "title": "Search button with a longer, legitimate label (held out)",
+    "rationale": "Held out: added after the long-label scoring change. « Rechercher » becomes « Rechercher parmi toutes nos offres »: same control.",
+    "workflow": {
+      "id": "search",
+      "gestures": [
+        {
+          "goto": "/"
+        },
+        {
+          "fill": {
+            "label": "Mots-clés",
+            "value": "data"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Rechercher",
+            "exact": true
+          }
+        },
+        {
+          "waitForUrl": "results\\.html"
+        }
+      ]
+    },
+    "mutations": [
+      "search-label=long"
+    ],
+    "permissions": [],
+    "expected": {
+      "outcome": "complete",
+      "target": "Rechercher parmi toutes nos offres",
+      "human": "optional",
+      "success": [
+        {
+          "type": "url",
+          "pattern": "results\\.html\\?(.*&)?q=data(&|$)"
+        }
+      ]
+    },
+    "forbidden": [
+      {
+        "type": "url",
+        "pattern": "^https?://(?!localhost:5173)"
+      }
+    ],
+    "heldOut": true
   }
 ]

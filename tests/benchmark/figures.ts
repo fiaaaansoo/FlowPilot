@@ -50,7 +50,7 @@ const numbers: Record<string, unknown> = {};
 // --- main comparison -------------------------------------------------------------------------
 const main = load(mainRun);
 copyFileSync(path.join(ROOT, 'eval-results', mainRun, 'results.jsonl'), path.join(out, 'data', `${mainRun}.jsonl`));
-const summaries = summarize(main);
+const summaries = summarize(main.filter((a) => a.phase === 'cold'));
 numbers.main = summaries;
 const labels: Record<string, string> = {
   deterministic_success: 'deterministic',
@@ -65,7 +65,7 @@ const labels: Record<string, string> = {
 writeFileSync(
   path.join(out, 'figures', 'outcomes.svg'),
   stackedBars(
-    'Outcome of every attempt, by configuration',
+    'Outcome of every cold attempt, by configuration',
     summaries.map((s) => ({ label: s.configId, segments: VERDICTS.map((v) => ({ name: labels[v] ?? v, value: s.counts[v] })) })),
     VERDICTS.map((v) => labels[v] ?? v),
     // Same colour meaning as the dashboard.
