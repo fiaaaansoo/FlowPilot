@@ -23,7 +23,8 @@ export function loadDataset(): Dataset {
   const hash = createHash('sha256');
   const scenarios: unknown[] = [];
   for (const file of manifest.files) {
-    const text = readFileSync(path.join(DIR, file), 'utf8');
+    // Line endings normalized: the same data hashes the same on a Windows checkout (CRLF) and in CI (LF).
+    const text = readFileSync(path.join(DIR, file), 'utf8').replace(/\r\n/g, '\n');
     hash.update(text);
     scenarios.push(...(JSON.parse(text) as unknown[]));
   }

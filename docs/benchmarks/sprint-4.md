@@ -28,3 +28,9 @@ npm run eval:figures -- --main s4-final --rot s4f-rot --settle 0=s4f-settle0,150
 (`s4f-settle3000` is the dynamic and semantic subset of `s4-final`, first repetition, deterministic and
 qwen2.5:3b.) Runs named `s4`, `s4-rot` and `s4-settle*` in older notes predate the review fixes and are
 not used.
+
+Dataset fingerprint: the `s4-final` manifests record `fb715844…`, computed on the Windows
+checkout (CRLF line endings). The loader now normalizes line endings before hashing; the
+same dataset 1.1.0 hashes to `b17b2b80410a8ae486818c936c5f185eaf7cf888935b26918b26572c22fec96d`
+on any platform.
+
