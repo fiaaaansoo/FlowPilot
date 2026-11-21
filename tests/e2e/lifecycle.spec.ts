@@ -55,9 +55,9 @@ async function startAndWaitForPendingRecovery(sidePanel: Page, serviceWorker: Wo
   await demo.bringToFront();
   await sidePanel.getByRole('button', { name: 'Rejouer' }).click();
   await expect(demo).toHaveURL('http://localhost:5173/');
-  // The missing element is reported once the page is settled (~1.5 s); the recovery request then
-  // takes DELAY_MS, so it is in flight from ~2 s to ~10 s.
-  await sidePanel.waitForTimeout(4_000);
+  // The missing element is reported once the page is settled (~3 s); the recovery request then
+  // takes DELAY_MS, so it is in flight from ~3.5 s to ~11 s.
+  await sidePanel.waitForTimeout(6_000);
 }
 
 async function expectPageUntouched(demo: Page): Promise<void> {

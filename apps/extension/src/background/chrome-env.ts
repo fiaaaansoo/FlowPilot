@@ -25,10 +25,12 @@ export const NAVIGATION_TIMEOUT_MS = 15_000;
 export const ELEMENT_TIMEOUT_MS = 10_000;
 /**
  * A missing element is reported once the page has been settled this long (no DOM change, no loading
- * indicator), instead of always waiting ELEMENT_TIMEOUT_MS. Chosen from the Sprint 4 measurements
- * (docs/benchmarks/sprint-4.md); build with VITE_FLOWPILOT_SETTLE_MS=0 to restore the fixed wait.
+ * indicator), instead of always waiting ELEMENT_TIMEOUT_MS. Measured in Sprint 4 (docs/benchmarks/
+ * sprint-4.md): 1500 ms missed elements that arrive after a silent 2.5 s pause; 3000 ms missed none
+ * of the dynamic scenarios and still cut the time to a recovered replay by more than half.
+ * Build with VITE_FLOWPILOT_SETTLE_MS=0 to restore the fixed wait.
  */
-export const ELEMENT_SETTLE_MS = Number(import.meta.env.VITE_FLOWPILOT_SETTLE_MS ?? '1500');
+export const ELEMENT_SETTLE_MS = Number(import.meta.env.VITE_FLOWPILOT_SETTLE_MS ?? '3000');
 const POLL_MS = 150;
 const CONTENT_SCRIPT_FILE = 'content.js';
 const RECORDER_SCRIPT_ID = 'flowpilot-recorder';

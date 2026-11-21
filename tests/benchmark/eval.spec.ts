@@ -220,7 +220,7 @@ for (const [index, config] of CONFIGS.entries()) {
             promptVersion: config.promptVersion,
             contextStrategy: config.contextStrategy,
             context: { maxElements: strategy.maxElements, maxChars: strategy.maxChars, ranking: strategy.ranking, numCtx: config.numCtx },
-            settleMs: Number(process.env.VITE_FLOWPILOT_SETTLE_MS ?? '1500'),
+            settleMs: Number(process.env.VITE_FLOWPILOT_SETTLE_MS ?? '3000'),
             repeats: REPEAT,
           },
         ],
