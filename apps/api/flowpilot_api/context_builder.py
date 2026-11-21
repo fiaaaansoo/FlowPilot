@@ -55,9 +55,6 @@ class ContextPack:
     truncated: bool
     by_ref: dict[str, ContextEntry] = field(default_factory=dict)
 
-    def shown(self, ref: str) -> ContextEntry | None:
-        return self.by_ref.get(ref)
-
 
 def _compact(entry: ContextEntry) -> dict[str, object]:
     c = entry.candidate
@@ -77,14 +74,27 @@ def _compact(entry: ContextEntry) -> dict[str, object]:
     return item
 
 
-def build_context(request: RecoveryRequest, *, max_elements: int = 12, max_chars: int = 6_000) -> ContextPack:
-    target = request.step.target
+def usable_candidates(request: RecoveryRequest) -> list[Candidate]:
+    """The only elements a recovery may use: compatible with the step, on the workflow origin (cross-origin
+    links are never executed, nor shown to the model), and not already rejected or failed."""
     rejected = {fingerprint(attempt.candidate) for attempt in request.attempts}
+    return [
+        c
+        for c in request.observation.elements
+        if accepts(request.step.kind, c) and c.same_origin and fingerprint(c) not in rejected
+    ]
 
-    # Cross-origin links can never be executed (no navigation outside the workflow origin):
-    # they are not even shown to the model.
+
+def build_context(
+    request: RecoveryRequest,
+    *,
+    usable: list[Candidate] | None = None,
+    max_elements: int = 12,
+    max_chars: int = 6_000,
+) -> ContextPack:
+    target = request.step.target
     compatible = [c for c in request.observation.elements if accepts(request.step.kind, c) and c.same_origin]
-    allowed = [c for c in compatible if fingerprint(c) not in rejected]
+    allowed = usable if usable is not None else usable_candidates(request)
 
     groups: dict[str, list[Candidate]] = {}
     for candidate in allowed:

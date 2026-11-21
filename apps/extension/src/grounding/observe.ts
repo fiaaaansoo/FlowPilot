@@ -1,5 +1,5 @@
-import { LIMITS, fail, ok, sanitizeUrl, type Candidate, type Observation, type Result } from '@flowpilot/shared';
-import { isIrreversibleAction, isSensitiveField } from '../recorder/classify';
+import { LIMITS, MAX_OBSERVATION_ELEMENTS, fail, ok, sanitizeUrl, type Candidate, type Observation, type Result } from '@flowpilot/shared';
+import { isIrreversibleAction, isSensitiveField, submissionScope } from '../recorder/classify';
 import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContext, stableAttributes, textOf } from './dom';
 
 /**
@@ -20,7 +20,7 @@ import { accessibleName, isDisabled, isVisible, normalizeText, roleOf, rowContex
 const OBSERVABLE =
   'a[href], button, input:not([type="hidden"]), select, textarea, summary, form, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="option"], [role="checkbox"], [role="radio"], [role="switch"], [role="textbox"], [role="searchbox"], [role="combobox"]';
 
-export const MAX_OBSERVED_ELEMENTS = 300;
+export const MAX_OBSERVED_ELEMENTS = MAX_OBSERVATION_ELEMENTS;
 
 interface Snapshot {
   id: string;
@@ -59,10 +59,9 @@ function sameOrigin(el: Element): boolean {
 
 /** Observed identity of an element: what must still hold when a proposal is executed. */
 export function describeCandidate(el: Element, ref: string): Candidate {
-  const isField = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
   const role = roleOf(el);
   const name = accessibleName(el);
-  const text = isField ? '' : normalizeText(textOf(el), 100);
+  const text = normalizeText(textOf(el), 100); // '' for fields: values are never read
   const context = rowContext(el);
   const section = sectionLabel(el);
   const candidate: Candidate = { ref, tag: el.tagName.toLowerCase(), attributes: stableAttributes(el) };
@@ -72,7 +71,7 @@ export function describeCandidate(el: Element, ref: string): Candidate {
   if (context && context !== name) candidate.context = context.slice(0, LIMITS.text);
   if (section && section !== name) candidate.section = section;
   if (isDisabled(el)) candidate.disabled = true;
-  if (isIrreversibleAction(el)) candidate.irreversible = true;
+  if (isIrreversibleAction(el) || isIrreversibleAction(submissionScope(el))) candidate.irreversible = true;
   if (!sameOrigin(el)) candidate.sameOrigin = false;
   return candidate;
 }

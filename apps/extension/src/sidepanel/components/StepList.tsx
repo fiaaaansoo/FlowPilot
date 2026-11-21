@@ -1,4 +1,5 @@
 import { describeStep, needsHuman, type RunSummary, type StepLog, type WorkflowStep } from '@flowpilot/shared';
+import { RECOVERY_STRATEGY_LABEL } from '../labels';
 
 interface Props {
   steps: readonly WorkflowStep[];
@@ -18,9 +19,9 @@ const STRATEGY_LABEL: Record<string, string> = {
   text: 'texte',
   combined: 'indices combinés',
   unconfirmed: 'page quittée après l’action',
-  'ai:memory': 'récupération IA (correction mémorisée)',
-  'ai:semantic': 'récupération IA (correspondance sémantique)',
-  'ai:llm': 'récupération IA (modèle de langage)',
+  'ai:memory': `récupération IA (${RECOVERY_STRATEGY_LABEL.memory})`,
+  'ai:semantic': `récupération IA (${RECOVERY_STRATEGY_LABEL.semantic})`,
+  'ai:llm': `récupération IA (${RECOVERY_STRATEGY_LABEL.llm})`,
 };
 
 type Status = StepLog['status'] | 'current' | 'pending';

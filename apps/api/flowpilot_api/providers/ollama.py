@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from .base import Message, ModelReply, ProviderError, ProviderUsage
+from .base import Message, ModelReply, ProviderError, ProviderUsage, chat_messages, post_json
 
 
 class OllamaProvider:
@@ -27,7 +27,7 @@ class OllamaProvider:
         self.base_url = base_url.rstrip("/")
         self.model: str | None = model
         self.num_ctx = num_ctx
-        self._transport = transport
+        self._client = httpx.Client(transport=transport)  # reused: one connection for all calls
 
     def complete(
         self,
@@ -43,17 +43,10 @@ class OllamaProvider:
             "stream": False,
             "format": schema,
             "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": max_output_tokens},
-            "messages": [{"role": "system", "content": system}]
-            + [{"role": m.role, "content": m.content} for m in messages],
+            "messages": chat_messages(system, messages),
         }
         started = time.perf_counter()
-        try:
-            with httpx.Client(timeout=timeout_s, transport=self._transport) as client:
-                response = client.post(f"{self.base_url}/api/chat", json=body)
-        except httpx.TimeoutException as exc:
-            raise ProviderError("timeout", f"Ollama did not answer within {timeout_s:.0f} s.", retryable=True) from exc
-        except httpx.HTTPError as exc:
-            raise ProviderError("unreachable", f"Ollama is unreachable at {self.base_url}: {exc}") from exc
+        response = post_json(self._client, f"{self.base_url}/api/chat", body, timeout_s=timeout_s, service="Ollama")
 
         if response.status_code == 404:
             raise ProviderError(

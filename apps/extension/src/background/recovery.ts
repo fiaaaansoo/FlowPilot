@@ -150,7 +150,7 @@ export function validateProposal(
 }
 
 /** Human-readable description of a candidate, for the confirmation prompt (untrusted text, display only). */
-export function describeCandidate(candidate: Candidate): string {
+export function candidateLabel(candidate: Candidate): string {
   const label = candidate.name ?? candidate.text ?? candidate.attributes['aria-label'] ?? candidate.attributes.name ?? `<${candidate.tag}>`;
   const where = candidate.context ?? candidate.section;
   return `« ${label} » (${candidate.role ?? candidate.tag})${where ? `, ligne « ${where.slice(0, 80)} »` : ''}`;
@@ -281,8 +281,13 @@ export async function recoverStep(env: RecoveryEnv, backend: BackendClient, ctx:
     // HUMAN: model doubt, irreversible element, original confirmation, or "always confirm" mode.
     let confirmed = false;
     const mustConfirm =
-      requiresConfirmation || candidate.irreversible === true || ctx.mode === 'confirm-always' || needsHuman(ctx.step);
-    const prompt: AiProposalPrompt = { kind: 'ai-proposal', proposed: describeCandidate(candidate), strategy, confidence, rationale };
+      requiresConfirmation ||
+      candidate.irreversible === true ||
+      ctx.mode === 'confirm-always' ||
+      needsHuman(ctx.step) ||
+      // Same rule as the backend, enforced here too: a model never redirects a value or a submission alone.
+      (strategy === 'llm' && ctx.step.kind !== 'click');
+    const prompt: AiProposalPrompt = { kind: 'ai-proposal', proposed: candidateLabel(candidate), strategy, confidence, rationale };
     if (mustConfirm) {
       if (!(await ctx.requestHuman(prompt))) return escalate('aborted', ABORTED, 'refusé par l’utilisateur');
       confirmed = true;

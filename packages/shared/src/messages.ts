@@ -2,7 +2,7 @@ import { isFiniteNumber, isNonEmptyString, isRecord } from './guards.js';
 import { isErrorCode, type Result } from './result.js';
 import { parseRecordedEvent, type PageEvent, type RecordedEvent } from './recording.js';
 import type { SessionState } from './session.js';
-import type { Candidate, Observation } from './recovery.js';
+import { MAX_OBSERVATION_ELEMENTS, isObservedRef, type Candidate, type Observation } from './recovery.js';
 import type { ElementStep } from './workflow.js';
 
 /**
@@ -112,8 +112,7 @@ export function isContentRequest(value: unknown): value is ContentRequest {
       return (
         isRecord(value.step) &&
         isNonEmptyString(value.snapshotId) &&
-        typeof value.ref === 'string' &&
-        /^e\d{1,5}$/.test(value.ref) &&
+        isObservedRef(value.ref) &&
         typeof value.confirmed === 'boolean'
       );
     default:
@@ -156,8 +155,8 @@ export function parseObservation(value: unknown): Observation | null {
     return null;
   }
   const elements: Candidate[] = [];
-  for (const raw of (value.elements as unknown[]).slice(0, 300)) {
-    if (!isRecord(raw) || typeof raw.ref !== 'string' || !/^e\d{1,5}$/.test(raw.ref) || !isNonEmptyString(raw.tag)) return null;
+  for (const raw of (value.elements as unknown[]).slice(0, MAX_OBSERVATION_ELEMENTS)) {
+    if (!isRecord(raw) || !isObservedRef(raw.ref) || !isNonEmptyString(raw.tag)) return null;
     if (!isRecord(raw.attributes)) return null;
     elements.push(raw as unknown as Candidate);
   }

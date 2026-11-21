@@ -2,7 +2,7 @@ import { fail, ok, type ElementStep, type PerformResponse } from '@flowpilot/sha
 import { isDisabled } from '../grounding/dom';
 import { resolveRef } from '../grounding/observe';
 import { waitForTarget } from '../grounding/resolve';
-import { isIrreversibleAction } from '../recorder/classify';
+import { isIrreversibleAction, submissionScope } from '../recorder/classify';
 
 /**
  * Exécution d'une étape dans la page (content script). Seules des actions
@@ -57,7 +57,7 @@ function actOn(el: Element, step: ElementStep, strategy: string, options: Perfor
   }
   // Défense en profondeur : l'élément effectivement trouvé est rejugé dans la page.
   // Une action qui paraît irréversible n'est jamais exécutée sans validation humaine.
-  const judged = step.kind === 'press' ? (el.closest('form') ?? el) : el;
+  const judged = step.kind === 'press' ? submissionScope(el) : el;
   if ((step.kind === 'click' || step.kind === 'submit' || step.kind === 'press') && !confirmed && isIrreversibleAction(judged)) {
     return fail('CONFIRMATION_REQUIRED', 'Cette action semble irréversible : confirmation humaine requise.');
   }

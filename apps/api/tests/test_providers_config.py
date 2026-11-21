@@ -162,6 +162,9 @@ def test_anthropic_uses_structured_output_and_caches_the_stable_prefix() -> None
     kwargs = client.messages.kwargs
     assert kwargs["model"] == "claude-opus-5-5"
     assert kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}
+    # The task and page context (first user message) is cached across tool turns of one recovery.
+    assert kwargs["messages"][0]["content"][0]["cache_control"] == {"type": "ephemeral"}
+    assert kwargs["max_tokens"] == 1024  # output bounded by the agent's budget, not a fixed 16k
     assert kwargs["output_config"]["format"] == {"type": "json_schema", "schema": ACTION_SCHEMA}
     assert "tool_choice" not in kwargs and "fallbacks" not in kwargs  # no forced tools, no silent model switch
     assert (reply.usage.cache_read_tokens, reply.usage.cache_write_tokens) == (1500, 0)

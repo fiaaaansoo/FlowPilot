@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from functools import lru_cache
 
 _STOPWORDS = frozenset(
     [
@@ -105,6 +106,7 @@ def stem(token: str) -> str:
     return token
 
 
+@lru_cache(maxsize=4096)
 def tokens(text: str | None) -> frozenset[str]:
     """Meaningful stemmed tokens of a label. Also splits camelCase and snake/kebab identifiers."""
     if not text:

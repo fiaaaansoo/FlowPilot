@@ -18,7 +18,7 @@ from typing import Any
 
 import httpx
 
-from .base import Message, ModelReply, ProviderError, ProviderUsage
+from .base import Message, ModelReply, ProviderError, ProviderUsage, chat_messages, post_json
 
 
 class OpenAICompatibleProvider:
@@ -45,7 +45,7 @@ class OpenAICompatibleProvider:
         self.model: str | None = model
         self.local = local
         self._api_key = api_key
-        self._transport = transport
+        self._client = httpx.Client(transport=transport)  # reused: one connection (and TLS session) for all calls
 
     def complete(
         self,
@@ -60,8 +60,7 @@ class OpenAICompatibleProvider:
             "model": self.model,
             "temperature": 0,
             "max_tokens": max_output_tokens,
-            "messages": [{"role": "system", "content": system}]
-            + [{"role": m.role, "content": m.content} for m in messages],
+            "messages": chat_messages(system, messages),
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {"name": "recovery_action", "schema": schema, "strict": True},
@@ -69,15 +68,14 @@ class OpenAICompatibleProvider:
         }
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
         started = time.perf_counter()
-        try:
-            with httpx.Client(timeout=timeout_s, transport=self._transport) as client:
-                response = client.post(f"{self.base_url}/chat/completions", json=body, headers=headers)
-        except httpx.TimeoutException as exc:
-            raise ProviderError(
-                "timeout", f"The model server did not answer within {timeout_s:.0f} s.", retryable=True
-            ) from exc
-        except httpx.HTTPError as exc:
-            raise ProviderError("unreachable", f"The model server is unreachable at {self.base_url}: {exc}") from exc
+        response = post_json(
+            self._client,
+            f"{self.base_url}/chat/completions",
+            body,
+            timeout_s=timeout_s,
+            service="The model server",
+            headers=headers,
+        )
 
         if response.status_code in {400, 422} and "response_format" in response.text:
             raise ProviderError("unsupported_capability", "This server does not support JSON-schema structured output.")

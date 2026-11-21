@@ -89,7 +89,9 @@ describe('review regressions', () => {
   it('Enter in a field of a destructive form still needs a human', () => {
     document.body.innerHTML = `
       <form aria-label="Compte"><input name="motif" aria-label="Motif" /><button type="submit">Supprimer mon compte</button></form>`;
-    const ref = observePage(document, ids).elements.find((e) => e.name === 'Motif')?.ref ?? '';
+    const motif = observePage(document, ids).elements.find((e) => e.name === 'Motif');
+    expect(motif?.irreversible).toBe(true); // flagged up front: Enter there submits the destructive form
+    const ref = motif?.ref ?? '';
     const step = { id: 's', kind: 'press' as const, key: 'Enter' as const, target: { tag: 'input', attributes: {}, css: 'x' } };
     expect(performByRef(step, `snap-${seq}`, ref, { confirmed: false })).toMatchObject({
       ok: false,

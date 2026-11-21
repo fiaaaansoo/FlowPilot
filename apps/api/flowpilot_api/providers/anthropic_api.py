@@ -21,21 +21,19 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from ..pricing import DEFAULT_CLAUDE_MODEL
 from .base import Message, ModelReply, ProviderError, ProviderUsage
 
-DEFAULT_MODEL = "claude-opus-5-5"
+DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL
 
 
 class AnthropicProvider:
     name = "anthropic"
     local = False
 
-    def __init__(
-        self, *, model: str | None, effort: str = "medium", max_tokens: int = 16_000, client: Any | None = None
-    ) -> None:
+    def __init__(self, *, model: str | None, effort: str = "medium", client: Any | None = None) -> None:
         self.model: str | None = model or DEFAULT_MODEL
         self.effort = effort
-        self.max_tokens = max_tokens
         if client is None:
             try:
                 import anthropic
@@ -61,9 +59,9 @@ class AnthropicProvider:
         try:
             response = self._client.with_options(timeout=timeout_s).messages.create(
                 model=self.model,
-                max_tokens=min(self.max_tokens, max_output_tokens),
+                max_tokens=max_output_tokens,
                 system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-                messages=[{"role": m.role, "content": m.content} for m in messages],
+                messages=_with_cached_context(messages),
                 output_config={"effort": self.effort, "format": {"type": "json_schema", "schema": schema}},
             )
         except anthropic.AuthenticationError as exc:
@@ -104,3 +102,12 @@ class AnthropicProvider:
             latency_ms=int((time.perf_counter() - started) * 1000),
             model=str(response.model),
         )
+
+
+def _with_cached_context(messages: list[Message]) -> list[dict[str, Any]]:
+    """The first user message holds the task and the page context, resent unchanged on every tool turn:
+    mark it as a cache breakpoint so later turns of the same recovery read it from the prompt cache."""
+    out: list[dict[str, Any]] = [{"role": m.role, "content": m.content} for m in messages]
+    if out and out[0]["role"] == "user":
+        out[0]["content"] = [{"type": "text", "text": messages[0].content, "cache_control": {"type": "ephemeral"}}]
+    return out

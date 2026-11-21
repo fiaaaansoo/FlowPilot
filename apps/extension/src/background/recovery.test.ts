@@ -188,6 +188,16 @@ describe('recoverStep', () => {
     expect(calls[0]?.confirmed).toBe(true);
   });
 
+  it('a model never redirects a recorded value alone, even if the backend does not ask', async () => {
+    const { recoveryEnv, calls } = env();
+    const requestHuman = vi.fn(() => Promise.resolve(true));
+    const step: ElementStep = { id: 's2', kind: 'input', value: 'data', target: target('Mots-clés') };
+    const result = await recoverStep(recoveryEnv, backend(propose('e4')).client, context({ step, requestHuman }));
+    expect(requestHuman).toHaveBeenCalledOnce();
+    expect(result.ok).toBe(true);
+    expect(calls[0]?.confirmed).toBe(true);
+  });
+
   it('stopping at the confirmation prompt executes nothing', async () => {
     const { recoveryEnv, calls } = env();
     const result = await recoverStep(

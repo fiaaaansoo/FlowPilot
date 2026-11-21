@@ -1,4 +1,5 @@
 import { isFiniteNumber, isNonEmptyString, isRecord } from './guards.js';
+import { LOCAL_HTTP_HOSTS } from './origin.js';
 import { fail, ok, type ErrorCode, type Result } from './result.js';
 import type { ElementStep, ElementTarget, StepKind } from './workflow.js';
 
@@ -119,6 +120,10 @@ export interface OutcomeReport {
 
 const STRATEGIES: ReadonlySet<unknown> = new Set<RecoveryStrategy>(['memory', 'semantic', 'llm', 'none']);
 const REF = /^e\d{1,5}$/;
+/** A snapshot element reference (`e1`…), as produced by the page observation. */
+export const isObservedRef = (value: unknown): value is string => typeof value === 'string' && REF.test(value);
+/** Most elements one observation may carry (same bound as the backend contract). */
+export const MAX_OBSERVATION_ELEMENTS = 300;
 const isNum = (v: unknown, min = 0): v is number => isFiniteNumber(v) && v >= min;
 const nullableNum = (v: unknown): v is number | null => v === null || isNum(v);
 const isStr = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max;
@@ -255,7 +260,7 @@ export function isLoopbackEndpoint(value: string): boolean {
     const url = new URL(value);
     return (
       url.protocol === 'http:' &&
-      (url.hostname === '127.0.0.1' || url.hostname === 'localhost') &&
+      LOCAL_HTTP_HOSTS.has(url.hostname) &&
       url.pathname.replace(/\/$/, '') === '' &&
       !url.search &&
       !url.hash &&

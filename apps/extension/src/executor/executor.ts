@@ -144,7 +144,7 @@ export async function runWorkflow(workflow: Workflow, driver: StepDriver, option
           recovery = recovered.log;
           if (recovered.ok) {
             result = { ok: true, value: { strategy: recovered.strategy } };
-            if (pendingRecovery) settleRecovery(true, `step ${index + 1} succeeded (recovered) after the recovered step`);
+            settleRecovery(true, `step ${index + 1} succeeded (recovered) after the recovered step`);
             pendingRecovery = { recoveryId: recovered.recoveryId, stepIndex: index };
           } else {
             const reason = recovered.log.reason ? ` Récupération IA : ${recovered.log.reason}.` : '';

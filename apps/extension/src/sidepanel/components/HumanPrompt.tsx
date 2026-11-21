@@ -1,4 +1,5 @@
 import { describeStep, type AiProposalPrompt, type WorkflowStep } from '@flowpilot/shared';
+import { RECOVERY_STRATEGY_LABEL } from '../labels';
 
 interface Props {
   step: WorkflowStep;
@@ -9,12 +10,6 @@ interface Props {
   onStop: () => void;
 }
 
-const STRATEGY: Record<AiProposalPrompt['strategy'], string> = {
-  memory: 'correction déjà vérifiée',
-  semantic: 'correspondance sémantique',
-  llm: 'modèle de langage',
-  none: 'aucune',
-};
 
 /**
  * Le replay attend une décision humaine : confirmer une action irréversible,
@@ -32,7 +27,7 @@ export function HumanPrompt({ step, proposal, busy, onContinue, onStop }: Props)
         <div id="human-text">
           <p>
             {describeStep(step)} : l’élément enregistré a changé. FlowPilot propose {proposal.proposed} (
-            {STRATEGY[proposal.strategy]}, confiance {Math.round(proposal.confidence * 100)} %).
+            {RECOVERY_STRATEGY_LABEL[proposal.strategy]}, confiance {Math.round(proposal.confidence * 100)} %).
           </p>
           {proposal.rationale && <p className="note">Justification du modèle, non vérifiée : {proposal.rationale}</p>}
         </div>

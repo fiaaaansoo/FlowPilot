@@ -132,10 +132,9 @@ def create_app(settings: Settings, *, provider: ModelProvider | None = None, sto
             )
             stored = True
         forgotten = 0
-        if not body.verified and row["strategy"] == "memory" and row["original_json"]:
-            # A memorized correction that did not work is not trusted again.
-            original = ElementTarget.model_validate_json(row["original_json"])
-            forgotten = store.forget_target(origin=row["origin"], target_fp=fingerprint(original))
+        if not body.verified and row["correction_id"] is not None:
+            # The memorized correction that was reused did not work: it is not trusted again.
+            forgotten = int(store.forget(row["correction_id"]))
         store.set_outcome(recovery_id, "verified" if body.verified else "failed", body.detail)
         return {"contract": CONTRACT, "memorized": stored, "forgotten": forgotten}
 

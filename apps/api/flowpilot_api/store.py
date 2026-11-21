@@ -71,12 +71,13 @@ CREATE TABLE IF NOT EXISTS recoveries (
   proposed_json TEXT,
   trace_json TEXT NOT NULL,
   outcome TEXT,
-  outcome_detail TEXT
+  outcome_detail TEXT,
+  correction_id INTEGER
 );
 """
 
 
-def _now() -> str:
+def now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
@@ -105,6 +106,9 @@ class Store:
         self._lock = threading.Lock()
         with self._tx() as conn:
             conn.executescript(SCHEMA)
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(recoveries)")}
+            if "correction_id" not in columns:  # databases created before memory reuses were tracked
+                conn.execute("ALTER TABLE recoveries ADD COLUMN correction_id INTEGER")
 
     @contextmanager
     def _tx(self) -> Iterator[sqlite3.Connection]:
@@ -161,7 +165,7 @@ class Store:
                     original.model_dump_json(by_alias=True),
                     corrected_json,
                     strategy,
-                    _now(),
+                    now_iso(),
                 ),
             )
             row = conn.execute(
@@ -173,15 +177,8 @@ class Store:
     def mark_used(self, correction_id: int) -> None:
         with self._tx() as conn:
             conn.execute(
-                "UPDATE corrections SET uses = uses + 1, last_used_at = ? WHERE id = ?", (_now(), correction_id)
+                "UPDATE corrections SET uses = uses + 1, last_used_at = ? WHERE id = ?", (now_iso(), correction_id)
             )
-
-    def forget_target(self, *, origin: str, target_fp: str) -> int:
-        """Drops the corrections of one recorded target on one origin (after a failed reuse)."""
-        with self._tx() as conn:
-            return conn.execute(
-                "DELETE FROM corrections WHERE origin = ? AND target_fp = ?", (origin, target_fp)
-            ).rowcount
 
     def forget(self, correction_id: int) -> bool:
         with self._tx() as conn:

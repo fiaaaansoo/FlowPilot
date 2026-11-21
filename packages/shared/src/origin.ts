@@ -33,7 +33,7 @@ export function originOf(url: string): string | null {
 }
 
 /** Hôtes accessibles en http clair (développement local), cf. `optional_host_permissions`. */
-const LOCAL_HTTP_HOSTS = new Set(['localhost', '127.0.0.1']);
+export const LOCAL_HTTP_HOSTS: ReadonlySet<string> = new Set(['localhost', '127.0.0.1']);
 
 /**
  * Vrai si le motif est couvert par `optional_host_permissions` du manifest

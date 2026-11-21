@@ -5,6 +5,7 @@ import {
   fail,
   isLoopbackEndpoint,
   isRecord,
+  ok,
   parseAiSettings,
   type AiSettings,
   type Command,
@@ -71,7 +72,7 @@ export interface ExtensionApi {
   forgetMemory(settings: AiSettings, id: number | 'all'): Promise<Result<void>>;
 }
 
-const WATCHED_KEYS = new Set<string>([...Object.values(SESSION_KEYS), ...Object.values(LOCAL_KEYS), AI_SETTINGS_KEY]);
+const WATCHED_KEYS = new Set<string>([...Object.values(SESSION_KEYS), ...Object.values(LOCAL_KEYS)]);
 
 export const EMPTY_SNAPSHOT: PanelSnapshot = {
   session: IDLE,
@@ -97,7 +98,7 @@ async function backendFetch(settings: AiSettings, path: string, init: RequestIni
     });
     if (response.status === 401) return fail('RECOVERY_UNAVAILABLE', 'Jeton refusé par le service.');
     if (!response.ok) return fail('RECOVERY_UNAVAILABLE', `Le service a répondu HTTP ${response.status}.`);
-    return { ok: true, value: (await response.json()) as unknown };
+    return ok((await response.json()) as unknown);
   } catch (error) {
     return fail('RECOVERY_UNAVAILABLE', `Service injoignable (${errorMessage(error)}).`);
   }
@@ -194,7 +195,7 @@ export const chromeApi: ExtensionApi = {
 
   async forgetMemory(settings, id) {
     const response = await backendFetch(settings, id === 'all' ? '/v1/memory' : `/v1/memory/${id}`, { method: 'DELETE' });
-    return response.ok ? { ok: true, value: undefined } : response;
+    return response.ok ? ok(undefined) : response;
   },
   removeOrigin: (pattern) => chrome.permissions.remove({ origins: [pattern] }),
 };

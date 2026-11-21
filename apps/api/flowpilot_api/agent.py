@@ -26,22 +26,25 @@ Acceptance policy (reliability over autonomy):
 
 from __future__ import annotations
 
+import json
 import time
 import uuid
+from collections import Counter
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .config import Settings
-from .context_builder import ContextPack, build_context, fingerprint, render_task, render_untrusted
+from .context_builder import ContextPack, build_context, fingerprint, render_task, render_untrusted, usable_candidates
 from .contracts import Binding, Candidate, Decision, Escalate, ProposeTarget, RecoveryRequest, RecoveryResponse, Usage
 from .grounding import Score, accepts, decide, rank, score
 from .pricing import estimate_cost
 from .prompts import ACTION_SCHEMA, PROMPT_VERSION, SYSTEM_PROMPT, render_user_message
 from .providers import Message, ModelProvider, ProviderError
-from .store import Correction, Store
+from .store import Correction, Store, now_iso
 from .text import normalize, tokens
 
 #: Thresholds for executing a model proposal without asking the user.
@@ -95,6 +98,10 @@ class _Run:
     cache_write: int | None = None
     cost: float = 0.0
     pack: ContextPack | None = None
+    #: Elements the recovery may use (compatible, same origin, not rejected), computed once.
+    usable: list[Candidate] = field(default_factory=list)
+    #: Memorized correction reused by this recovery, forgotten if the reuse fails.
+    correction_id: int | None = None
     #: Refs the model has seen (context, search results, inspections): the only refs it may propose.
     shown: set[str] = field(default_factory=set)
     proposed: Candidate | None = None
@@ -119,8 +126,6 @@ class RecoveryAgent:
 
     def _decide(self, run: _Run) -> Decision:
         request = run.request
-        elements = [c for c in request.observation.elements if c.ref]
-        rejected = {fingerprint(a.candidate) for a in request.attempts}
 
         # CLASSIFY: only target-resolution failures, never sensitive fields.
         run.log(State.CLASSIFY, failure=request.failure.code, kind=request.step.kind, attempts=len(request.attempts))
@@ -129,9 +134,7 @@ class RecoveryAgent:
         if _origin(request.page.url) != request.binding.origin:
             return self._escalate(run, "none", "The page is not on the workflow's origin.")
 
-        usable = [
-            c for c in elements if accepts(request.step.kind, c) and fingerprint(c) not in rejected and c.same_origin
-        ]
+        run.usable = usable = usable_candidates(request)
 
         # MEMORY: a verified correction is reused only if it matches exactly one current element.
         prior = self._memory_lookup(run)
@@ -140,6 +143,7 @@ class RecoveryAgent:
             run.log(State.MEMORY, correction=prior.id, matches=len(matches))
             if len(matches) == 1:
                 self.store.mark_used(prior.id)
+                run.correction_id = prior.id
                 return self._propose(run, matches[0], 0.95, "memory", "Verified correction from a previous run.")
         else:
             run.log(State.MEMORY, correction=None)
@@ -147,6 +151,7 @@ class RecoveryAgent:
         # BUILD_CONTEXT
         pack = build_context(
             request,
+            usable=usable,
             max_elements=self.settings.context_max_elements,
             max_chars=self.settings.context_max_chars,
         )
@@ -306,15 +311,7 @@ class RecoveryAgent:
 
     def _tool(self, run: _Run, action: ModelAction) -> str:
         """Read-only tools over the observation the extension sent. They never touch the browser."""
-        import json
-
-        request = run.request
-        rejected = {fingerprint(a.candidate) for a in request.attempts}
-        usable = [
-            c
-            for c in request.observation.elements
-            if accepts(request.step.kind, c) and fingerprint(c) not in rejected and c.same_origin
-        ]
+        usable = run.usable
         if action.action == "find_elements":
             wanted = tokens(action.query)
             found = [
@@ -353,14 +350,10 @@ class RecoveryAgent:
             return self._escalate(run, "llm", f"Proposal rejected: {problem}.")
 
         support: Score = score(request.step.target, candidate)
-        usable = [
-            c
-            for c in request.observation.elements
-            if accepts(request.step.kind, c) and fingerprint(c) not in rejected and c.same_origin
-        ]
+        usable = run.usable
         # Identical copies are counted over the whole observation, not only the context pack: a copy found
         # through find_elements is still a copy.
-        duplicates = sum(1 for c in usable if fingerprint(c) == fingerprint(candidate)) - 1
+        duplicates = Counter(fingerprint(c) for c in usable)[fingerprint(candidate)] - 1
         # Independent evidence: the deterministic ranking, which page text cannot steer towards an element
         # unlike the recorded one, must put the same element clearly first. Model confidence alone never suffices.
         ranked = rank(request.step.target, request.step.kind, usable)
@@ -411,8 +404,6 @@ class RecoveryAgent:
     # --- result -----------------------------------------------------------------
 
     def _finish(self, run: _Run, decision: Decision) -> RecoveryResponse:
-        import json
-
         request = run.request
         recovery_id = uuid.uuid4().hex
         latency = int((time.perf_counter() - run.started) * 1000)
@@ -433,7 +424,7 @@ class RecoveryAgent:
         self.store.record_recovery(
             {
                 "id": recovery_id,
-                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "created_at": now_iso(),
                 "origin": b.origin,
                 "workflow_id": b.workflow_id,
                 "step_id": b.step_id,
@@ -461,6 +452,7 @@ class RecoveryAgent:
                 "original_json": request.step.target.model_dump_json(by_alias=True),
                 "proposed_json": run.proposed.model_dump_json(by_alias=True) if run.proposed else None,
                 "trace_json": json.dumps(run.trace, ensure_ascii=False),
+                "correction_id": run.correction_id,
             }
         )
         return RecoveryResponse(recovery_id=recovery_id, binding=b, decision=decision, usage=usage)
@@ -483,7 +475,5 @@ def _describe(candidate: Candidate) -> dict[str, Any]:
 
 
 def _origin(url: str) -> str:
-    from urllib.parse import urlsplit
-
     parts = urlsplit(url)
     return f"{parts.scheme}://{parts.netloc}".lower()

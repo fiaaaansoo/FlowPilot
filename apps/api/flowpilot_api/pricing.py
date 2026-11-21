@@ -30,6 +30,22 @@ CLAUDE_PRICES: dict[str, Price] = {
 }
 
 
+#: Default model of the Anthropic provider (kept here so that configuration can check its price).
+DEFAULT_CLAUDE_MODEL = "claude-opus-5-5"
+
+
+def price_for(
+    model: str | None, override_input: float | None = None, override_output: float | None = None
+) -> Price | None:
+    """Price of a paid model: the built-in Claude price list, adjusted by the environment overrides."""
+    price = CLAUDE_PRICES.get(model or "")
+    if override_input is None and override_output is None:
+        return price
+    base = price or Price(0, 0, 0, 0)
+    unit = override_input if override_input is not None else base.input
+    return Price(unit, override_output if override_output is not None else base.output, unit * 0.1, unit * 1.25)
+
+
 def estimate_cost(
     *,
     provider_local: bool,
@@ -43,16 +59,8 @@ def estimate_cost(
 ) -> float:
     if provider_local:
         return 0.0
-    price = CLAUDE_PRICES.get(model or "")
-    if override_input is not None or override_output is not None:
-        base = price or Price(0, 0, 0, 0)
-        price = Price(
-            override_input if override_input is not None else base.input,
-            override_output if override_output is not None else base.output,
-            (override_input if override_input is not None else base.input) * 0.1,
-            (override_input if override_input is not None else base.input) * 1.25,
-        )
-    if price is None:
+    price = price_for(model, override_input, override_output)
+    if price is None:  # cannot happen for a configured paid provider: load_settings refuses unknown prices
         return 0.0
     total = (
         input_tokens * price.input

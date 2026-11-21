@@ -9,6 +9,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
+
+from .pricing import DEFAULT_CLAUDE_MODEL, price_for
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
@@ -144,24 +147,16 @@ def _openai_is_local(base_url: str | None) -> bool:
         return False
     if _flag("FLOWPILOT_OPENAI_IS_LOCAL"):
         return True
-    from urllib.parse import urlsplit
-
     host = (urlsplit(base_url).hostname or "") if base_url else ""
     return host in LOOPBACK_HOSTS
 
 
 def _require_price(provider: str, model: str | None, local: bool, price_in: str | None, price_out: str | None) -> None:
     """Refuse to start a paid provider whose cost cannot be estimated: the cost budget would not apply."""
-    from .pricing import CLAUDE_PRICES
-
-    if price_in and price_out:
-        return
+    paid = provider == "anthropic" or (provider == "openai-compatible" and not local)
     if provider == "anthropic":
-        from .providers.anthropic_api import DEFAULT_MODEL
-
-        if (model or DEFAULT_MODEL) in CLAUDE_PRICES:
-            return
-    elif provider != "openai-compatible" or local:
+        model = model or DEFAULT_CLAUDE_MODEL
+    if not paid or (price_in and price_out) or price_for(model) is not None:
         return
     raise ConfigError(
         f"No price is known for model {model or '(default)'} of provider {provider}: set "
