@@ -8,7 +8,7 @@ import { expect, test } from '../e2e/fixtures';
 import { enableAiRecovery, latestRun, startRecording, stopRecording, waitForCapture } from '../e2e/helpers';
 import { CONTEXT_STRATEGIES, parseConfig } from './configs';
 import { loadDataset } from './dataset';
-import { environment, gitState, ollamaInfo } from './environment';
+import { OLLAMA_URL, environment, gitState, ollamaInfo } from './environment';
 
 /**
  * Evaluation runner (method: docs/benchmarks/README.md). One Playwright test per
@@ -26,7 +26,6 @@ import { environment, gitState, ollamaInfo } from './environment';
  */
 
 const TOKEN = 'eval-token-0123456789abcdefghijkl';
-const OLLAMA_URL = 'http://127.0.0.1:11434';
 const ORIGIN = 'http://localhost:5173';
 const REPLAY_DEADLINE_MS = 60_000;
 const RUN_ID = process.env.FLOWPILOT_EVAL_RUN ?? new Date().toISOString().replace(/[:.]/g, '-');

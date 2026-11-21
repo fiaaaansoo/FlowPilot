@@ -5,7 +5,7 @@ import type { Manifest } from '@flowpilot/evaluation';
 
 /** Facts about the machine and the code a run used, for the run manifest. Missing facts are null, never guessed. */
 
-const OLLAMA_URL = 'http://127.0.0.1:11434';
+export const OLLAMA_URL = 'http://127.0.0.1:11434';
 const ROOT = path.resolve(import.meta.dirname, '../..');
 
 function run(command: string, args: string[], cwd = ROOT): string | null {

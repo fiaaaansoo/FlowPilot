@@ -1,3 +1,4 @@
+import { escapeMarkup } from './charts.js';
 import type { DashboardData } from './report.js';
 
 /**
@@ -8,7 +9,7 @@ import type { DashboardData } from './report.js';
  */
 export function renderDashboard(data: DashboardData, clientScript: string): string {
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
-  const title = data.title.replace(/[<&>"]/g, (c) => `&#${String(c.charCodeAt(0))};`);
+  const title = escapeMarkup(data.title);
   return `<!doctype html>
 <html lang="en">
 <head>

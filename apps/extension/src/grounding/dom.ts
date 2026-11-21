@@ -309,13 +309,7 @@ function isSubmitter(el: Element): el is HTMLButtonElement | HTMLInputElement {
 
 /** Does activating the element keep the user and the form data on the page's origin? */
 export function sameOrigin(el: Element): boolean {
-  const target = destination(el);
-  if (!target) return true;
-  try {
-    return new URL(target, el.ownerDocument.baseURI).origin === el.ownerDocument.defaultView?.location.origin;
-  } catch {
-    return false;
-  }
+  return foreignDestination(el) === null; // an unparsable destination counts as foreign
 }
 
 /**

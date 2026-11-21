@@ -12,7 +12,6 @@ import {
   lineChart,
   barChart,
   quantile,
-  stdev,
   summarize,
   summarizeLatency,
   validateScenario,
@@ -43,12 +42,10 @@ describe('statistics', () => {
     expect(mcnemarExact(5, 5).pValue).toBe(1);
   });
 
-  it('quantiles, median and standard deviation', () => {
+  it('quantiles and median', () => {
     expect(median([3, 1, 2])).toBe(2);
     expect(median([1, 2, 3, 4])).toBe(2.5);
     expect(quantile([1, 2, 3, 4, 5], 0.95)).toBeCloseTo(4.8, 6);
-    expect(stdev([2, 4, 4, 4, 5, 5, 7, 9])).toBeCloseTo(2.138, 3);
-    expect(stdev([1])).toBeNaN();
   });
 
   it('p95 is withheld below 20 samples', () => {

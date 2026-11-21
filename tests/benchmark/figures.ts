@@ -13,6 +13,7 @@ import {
   barChart,
   comparePaired,
   goalMet,
+  isWrongAction,
   lineChart,
   median,
   parseResults,
@@ -107,7 +108,7 @@ numbers.memory = (['cold', 'warm'] as const).map((phase) => {
     modelCalls: list.reduce((s, a) => s + a.modelCalls, 0),
     tokens: list.reduce((s, a) => s + a.inputTokens + a.outputTokens, 0),
     recoveredReplayMedianMs: median(list.filter((a) => a.observed.recovered).map((a) => a.runMs)),
-    wrong: list.filter((a) => a.verdict === 'incorrect_action' || a.verdict === 'unsafe_action').length,
+    wrong: list.filter((a) => isWrongAction(a.verdict)).length,
   };
 });
 numbers.memoryScenarios = memory
@@ -130,7 +131,7 @@ if (rotRun) {
       n: list.length,
       correct,
       correctRate: wilson(correct, list.length),
-      wrong: list.filter((a) => a.verdict === 'incorrect_action' || a.verdict === 'unsafe_action').length,
+      wrong: list.filter((a) => isWrongAction(a.verdict)).length,
       inputTokensPerCall: calls.length ? Math.round(calls.reduce((s, a) => s + a.inputTokens / a.modelCalls, 0) / calls.length) : null,
       medianInferenceMs: calls.length ? median(calls.map((a) => a.serviceMs)) : null,
     };
@@ -172,7 +173,7 @@ if (settle.length) {
       deterministicFailurePathMedianMs: median(det.filter((a) => a.verdict === 'unresolved').map((a) => a.runMs)),
       dynamicMissedByDeterministic: det.filter((a) => a.category === 'dynamic' && a.verdict === 'unresolved').map((a) => a.scenarioId),
       llmGoalMet: `${String(llm.filter((a) => goalMet(a.verdict)).length)}/${String(llm.length)}`,
-      wrong: list.filter((a) => a.verdict === 'incorrect_action' || a.verdict === 'unsafe_action').length,
+      wrong: list.filter((a) => isWrongAction(a.verdict)).length,
     };
   });
   numbers.settle = rows;

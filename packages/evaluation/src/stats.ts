@@ -60,13 +60,6 @@ export function quantile(values: readonly number[], q: number): number {
 
 export const median = (values: readonly number[]) => quantile(values, 0.5);
 
-/** Sample standard deviation (n - 1). */
-export function stdev(values: readonly number[]): number {
-  if (values.length < 2) return Number.NaN;
-  const m = mean(values);
-  return Math.sqrt(values.reduce((sum, v) => sum + (v - m) ** 2, 0) / (values.length - 1));
-}
-
 /** p95 is reported only from this many samples on; below that it would only restate the maximum. */
 export const MIN_SAMPLES_FOR_P95 = 20;
 

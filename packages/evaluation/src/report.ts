@@ -1,4 +1,4 @@
-import { comparePaired, goalMet, summarize, type AttemptRecord, type ConfigSummary, type Manifest, type Verdict } from './results.js';
+import { VERDICTS, comparePaired, goalMet, isWrongAction, proposalMatches, summarize, type AttemptRecord, type ConfigSummary, type Manifest } from './results.js';
 import { summarizeLatency, wilson, type Interval, type LatencySummary } from './stats.js';
 
 /** Markdown report and dashboard data, computed only from stored results. Nothing is estimated or filled in. */
@@ -25,9 +25,7 @@ function outcomeTable(summaries: ConfigSummary[]): string {
     summaries.map((s) => [
       `\`${s.configId}\``,
       String(s.attempts),
-      ...(['deterministic_success', 'autonomous_recovery', 'confirmed_recovery', 'correct_refusal', 'unresolved', 'incorrect_action', 'unsafe_action', 'timeout'] as Verdict[]).map((v) =>
-        String(s.counts[v]),
-      ),
+      ...VERDICTS.map((v) => String(s.counts[v])),
     ]),
   );
 }
@@ -72,7 +70,7 @@ function categoryTable(attempts: readonly AttemptRecord[], configs: string[]): s
         const list = attempts.filter((a) => a.configId === config && a.category === category && a.phase === 'cold');
         if (!list.length) return '–';
         const met = list.filter((a) => goalMet(a.verdict)).length;
-        const wrong = list.filter((a) => a.verdict === 'incorrect_action' || a.verdict === 'unsafe_action').length;
+        const wrong = list.filter((a) => isWrongAction(a.verdict)).length;
         return `${String(met)}/${String(list.length)} goal met${wrong ? `, **${String(wrong)} wrong**` : ''}`;
       }),
     ]),
@@ -91,7 +89,7 @@ function distractorTable(attempts: readonly AttemptRecord[]): string | null {
       const list = withDistractors.filter((a) => a.configId === config && a.distractors === level && a.phase === 'cold');
       if (!list.length) continue;
       const proposals = list.filter((a) => a.proposals.length > 0 && a.expected.target !== null);
-      const correct = proposals.filter((a) => a.proposals.some((p) => p.includes(`« ${a.expected.target as string} »`)));
+      const correct = proposals.filter((a) => a.proposals.some((p) => proposalMatches(p, a.expected.target as string, a.expected.targetContext)));
       const calls = list.filter((a) => a.modelCalls > 0);
       rows.push([
         `\`${config}\``,
@@ -100,7 +98,7 @@ function distractorTable(attempts: readonly AttemptRecord[]): string | null {
         pct(wilson(correct.length, proposals.length)),
         calls.length ? Math.round(calls.reduce((s, a) => s + a.inputTokens / a.modelCalls, 0) / calls.length).toLocaleString('en-US') : 'n/a',
         latency(summarizeLatency(calls.map((a) => a.serviceMs))),
-        String(list.filter((a) => a.verdict === 'incorrect_action' || a.verdict === 'unsafe_action').length),
+        String(list.filter((a) => isWrongAction(a.verdict)).length),
       ]);
     }
   }
@@ -126,7 +124,7 @@ function memoryTable(attempts: readonly AttemptRecord[]): string | null {
         String(calls),
         (list.reduce((s, a) => s + a.inputTokens + a.outputTokens, 0)).toLocaleString('en-US'),
         latency(summarizeLatency(list.filter((a) => a.observed.recovered).map((a) => a.runMs))),
-        String(list.filter((a) => a.verdict === 'incorrect_action' || a.verdict === 'unsafe_action').length),
+        String(list.filter((a) => isWrongAction(a.verdict)).length),
       ];
     }),
   );
@@ -225,7 +223,7 @@ export function renderMarkdown(manifests: readonly Manifest[], attempts: readonl
   if (memory) parts.push('', '## Memory: cold versus warm replays', '', memory);
   const rot = distractorTable(attempts);
   if (rot) parts.push('', '## Context size and distractors', '', rot);
-  const failures = attempts.filter((a) => a.verdict === 'incorrect_action' || a.verdict === 'unsafe_action' || a.verdict === 'timeout');
+  const failures = attempts.filter((a) => isWrongAction(a.verdict) || a.verdict === 'timeout');
   parts.push('', '## Wrong actions and timeouts', '');
   parts.push(
     failures.length

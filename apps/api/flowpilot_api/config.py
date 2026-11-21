@@ -54,6 +54,11 @@ def _flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes"}
 
 
+def _enabled(name: str) -> bool:
+    """On unless explicitly set to "off"."""
+    return os.environ.get(name, "on").strip().lower() != "off"
+
+
 @dataclass(frozen=True)
 class Settings:
     api_token: str
@@ -144,8 +149,8 @@ def load_settings(env_file: Path | None = None) -> Settings:
         llm_max_retries=_int("FLOWPILOT_LLM_MAX_RETRIES", 1),
         context_max_elements=_int("FLOWPILOT_CONTEXT_MAX_ELEMENTS", 12),
         context_max_chars=_int("FLOWPILOT_CONTEXT_MAX_CHARS", 6_000),
-        context_ranking=os.environ.get("FLOWPILOT_CONTEXT_RANKING", "on").strip().lower() != "off",
-        memory_enabled=os.environ.get("FLOWPILOT_MEMORY", "on").strip().lower() != "off",
+        context_ranking=_enabled("FLOWPILOT_CONTEXT_RANKING"),
+        memory_enabled=_enabled("FLOWPILOT_MEMORY"),
         prompt_version=_prompt_version(),
         ollama_keep_alive=os.environ.get("FLOWPILOT_OLLAMA_KEEP_ALIVE", "5m"),
         db_path=Path(os.environ.get("FLOWPILOT_DB_PATH", ".data/flowpilot.sqlite3")),
